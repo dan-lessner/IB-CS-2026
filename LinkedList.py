@@ -1,7 +1,4 @@
 class Node:
-    """
-    Class representing a linked list node.
-    """
     def __init__(self, data):
         self.data = data  # Value stored in the node
         self.next = None  # Reference to the next node
