@@ -67,13 +67,15 @@ class LinkedList:
             current = current.next
         print("None")
 
-# Example usage:
-ll = LinkedList()
-ll.append(1)
-ll.append(2)
-ll.append(3)
-ll.print_list()  # Output: 1 -> 2 -> 3 -> None
+# When imported, does not run the example usage so it doesnt create a mess
+if __name__ == "__main__":
+    # Example usage:
+    ll = LinkedList()
+    ll.append(1)
+    ll.append(2)
+    ll.append(3)
+    ll.print_list()  # Output: 1 -> 2 -> 3 -> None
 
-node_to_remove = ll.head.next  # Node with value 2
-ll.remove_node(node_to_remove)
-ll.print_list()  # Output: 1 -> 3 -> None
+    node_to_remove = ll.head.next  # Node with value 2
+    ll.remove_node(node_to_remove)
+    ll.print_list()  # Output: 1 -> 3 -> None
