@@ -9,3 +9,4 @@ Signatures:
 * Pan učitel ntp
 * Jan Sikora
 * Olda Zahradník (to udělal sám)
+* Andy
