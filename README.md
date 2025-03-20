@@ -10,3 +10,4 @@ Signatures:
 * Jan Sikora
 * Olda Zahradník (to udělal sám)
 * Andy
+* Jindra Planeta
