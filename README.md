@@ -6,3 +6,4 @@ Signatures:
 * Jakub Kubin
 * Jia hao Lai (aura)
 * Pan učitel VS
+* Pan učitel ntp
