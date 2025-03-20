@@ -7,4 +7,6 @@ Signatures:
 * Jia hao Lai (aura)
 * Pan učitel VS
 * Pan učitel ntp
+* Jan Sikora
+* Olda Zahradník (to udělal sám)
 * Andy
