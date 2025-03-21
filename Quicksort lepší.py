@@ -1,7 +1,7 @@
 import random
 array = []
 values_number = int(input("Number of values in the list "))
-list_range = int(input("How many digits you want to create? "))
+list_range = int(input("How many digits you want to create? (The number you put in will act as an exponential to number 10) "))
 
 for i in range(0, values_number):
     n = random.randint(1, 10**list_range)
