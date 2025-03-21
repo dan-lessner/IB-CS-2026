@@ -1,7 +1,11 @@
 import random
+array = []
+values_number = int(input("Number of values in the list "))
+list_range = int(input("How many digits you want to create? "))
 
-list_range = int(input("Number of values in the list "))
-array = random.sample(range(1, list_range), (list_range - 1))
+for i in range(0, values_number):
+    n = random.randint(1, 10**list_range)
+    array.append(n)
 
 def quicksort(array):
     if len(array) <= 1:
