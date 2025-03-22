@@ -2,7 +2,7 @@
 
 * len function for lists
 * is_empty function for lists
-* list reversal
+* list reversal - done in reverse() by Kuba
 * removing a value (as opposed to a node)
 * concatenation
 
