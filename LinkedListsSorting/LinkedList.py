@@ -46,6 +46,16 @@ class LinkedList:
             last = last.next
         last.next = new_node
 
+    def reverse(self):
+        prev, curr = None, self.head
+        while curr:
+            next = curr.next
+            curr.next = prev
+            prev = curr
+            curr = next
+        self.head = prev
+        
+
     def remove_node(self, node):
         """Removes the given node from the list."""
         if not self.head or not node:
