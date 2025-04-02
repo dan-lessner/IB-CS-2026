@@ -1,6 +1,6 @@
 # What we want from HL students:
 
-* len function for lists
+* len function for lists (taken by Honza)
 * is_empty function for lists
 * list reversal - done in reverse() by Kuba
 * removing a value (as opposed to a node)

@@ -76,6 +76,26 @@ class LinkedList:
             print(current.data, end=" -> ")
             current = current.next
         print("None")
+    def len(self):
+        count = 0
+        current = self.head
+        while current:
+            count+=1
+            current = current.next
+        return count
+    def is_empty(self):
+        if self.head == None:
+            return True
+        else:
+            return False
+    def by_index(self, index):
+        curr_index = 0
+        current = self.head
+        while current:
+            if curr_index == index:
+                return current.data
+            curr_index +=1
+            current = current.next
 
 # When imported, does not run the example usage so it doesnt create a mess
 if __name__ == "__main__":
