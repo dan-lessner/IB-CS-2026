@@ -3,6 +3,7 @@ class Node:
     Class representing a linked list node.
     """
     def __init__(self, data):
+        self.prev = None
         self.data = data  # Value stored in the node
         self.next = None  # Reference to the next node
 
@@ -27,6 +28,10 @@ class Node:
     def is_last(self):
         """Checks if the node is the last in the list."""
         return self.next is None
+    
+    def is_first(self):
+        """Checks if the node is the first in the list."""
+        return self.prev is None
 
 class LinkedList:
     """
@@ -44,7 +49,7 @@ class LinkedList:
         last = self.head
         while last.next: 
             last = last.next
-        last.next = new_node
+        last.next, new_node.prev = new_node, last
 
     def reverse(self):
         prev, curr = None, self.head
@@ -67,13 +72,13 @@ class LinkedList:
         while current.next and current.next != node:
             current = current.next
         if current.next == node:
-            current.next = node.next  # Bypassing the node
+            current.next, node.next.prev = node.next, current  # Bypassing the node
 
     def print_list(self):
         """Prints the elements of the list."""
         current = self.head
         while current:
-            print(current.data, end=" -> ")
+            print(current.data, end=" <--> ")
             current = current.next
         print("None")
     def len(self):
