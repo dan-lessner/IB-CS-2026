@@ -11,3 +11,4 @@ Signatures:
 * Olda Zahradník (to udělal sám)
 * Andy
 * Jindra Planeta
+* Dominik Novotný
