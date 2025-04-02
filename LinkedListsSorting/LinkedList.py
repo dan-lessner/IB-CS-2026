@@ -76,6 +76,7 @@ class LinkedList:
             print(current.data, end=" -> ")
             current = current.next
         print("None")
+
     def len(self):
         count = 0
         current = self.head
@@ -83,11 +84,13 @@ class LinkedList:
             count+=1
             current = current.next
         return count
+    
     def is_empty(self):
         if self.head == None:
             return True
         else:
             return False
+        
     def by_index(self, index):
         curr_index = 0
         current = self.head
