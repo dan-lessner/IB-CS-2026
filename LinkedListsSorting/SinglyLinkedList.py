@@ -96,7 +96,7 @@ class LinkedList():
                 return current.data
             curr_index +=1
             current = current.next
-    def concatenate_linked_lists(list1, list2):
+    def concatenate(list1, list2):
         if not list1.head:  
             return list2
         if not list2.head:  
