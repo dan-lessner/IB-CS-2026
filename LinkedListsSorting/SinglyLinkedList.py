@@ -96,6 +96,20 @@ class LinkedList():
                 return current.data
             curr_index +=1
             current = current.next
+    def concatenate_linked_lists(list1, list2):
+        if not list1.head:  
+            return list2
+        if not list2.head:  
+            return list1
+
+        # Find the last node of the first list
+        last_node = list1.head
+        while last_node.next:
+            last_node = last_node.next
+
+    # Link the last node of the first list to the head of the second list
+        last_node.next = list2.head
+        return list1
 
 # When imported, does not run the example usage so it doesnt create a mess
 if __name__ == "__main__":
