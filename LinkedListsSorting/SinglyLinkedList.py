@@ -1,4 +1,4 @@
-class Node:
+class LNode:
     """
     Class representing a linked list node.
     """
@@ -8,19 +8,19 @@ class Node:
 
     def __eq__(self, other):
         """Checks if two nodes have the same data value."""
-        if isinstance(other, Node):
+        if isinstance(other, LNode):
             return self.data == other.data
         return False
 
     def __lt__(self, other):
         """Checks if this node's data is less than another node's data."""
-        if isinstance(other, Node):
+        if isinstance(other, LNode):
             return self.data < other.data
         return False
 
     def __gt__(self, other):
         """Checks if this node's data is greater than another node's data."""
-        if isinstance(other, Node):
+        if isinstance(other, LNode):
             return self.data > other.data
         return False
 
@@ -28,7 +28,7 @@ class Node:
         """Checks if the node is the last in the list."""
         return self.next is None
 
-class LinkedList:
+class LinkedList():
     """
     Class representing a linked list
     """
@@ -37,7 +37,7 @@ class LinkedList:
 
     def append(self, data):
         """Adds a new element to the end of the list."""
-        new_node = Node(data)
+        new_node = LNode(data)
         if not self.head:
             self.head = new_node
             return
