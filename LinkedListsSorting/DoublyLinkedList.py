@@ -65,6 +65,7 @@ class DoublyLinkedList(SinglyLinkedList.LinkedList):
         return list1
 
     def swap(self, node1Index, node2Index):
+        # find nodes based on Index
         node1 = self.head
         for x in range(node1Index):
             node1 = node1.next
@@ -72,17 +73,22 @@ class DoublyLinkedList(SinglyLinkedList.LinkedList):
         for x in range(node2Index):
             node2 = node2.next
 
+        # temporary definitions
         prev, next = node1.prev, node2.next
+
+        # if first node is first, point second node nowhere and make it self.head
         if not node1.is_first(): 
             prev.next, node2.prev = node2, prev
         else:
             node2.prev, self.head = None, node2
 
+        # if second node is last, point first node nowhere
         if not node2.is_last(): 
             next.prev, node1.next = node1, next
         else:
             node1.next = None
 
+        # swap inner pointers
         node1.prev, node2.next = node2, node1
 
 # When imported, does not run the example usage so it doesnt create a mess
