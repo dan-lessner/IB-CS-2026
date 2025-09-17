@@ -39,7 +39,7 @@ def stars7(n):
 def stars8(n):
     print("*")
     if n > 1 :
-    for j in range(s):
+    for j in range(n):
         print("*")
 
 def stars9 ( n ) :
