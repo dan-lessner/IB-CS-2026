@@ -4,7 +4,7 @@
 * is_empty function for lists - done in len() by Honza
 * list reversal - done in reverse() by Kuba
 * removing a value (as opposed to a node)
-* concatenation
+* concatenation (takenn by Dominik)
 
 # What we want from everyone:
 
