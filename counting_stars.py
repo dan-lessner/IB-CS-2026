@@ -1,3 +1,5 @@
+import math
+
 def stars1(n):
     for i in range(n):
         print("*")
@@ -21,9 +23,23 @@ def stars4(n):
 
 def stars5(n) :
   i = 1
+  s = 0
   while i*i < n :
-    print ("*")
+    #print ("*",end="")
+    s = s + 1
     i = i+1
+  print(f"""{j}: s {s}, 
+        A: {math.floor(math.sqrt(j-1))}, 
+        B: {math.ceil(math.sqrt(j)-1)}, 
+        C: {math.floor(math.sqrt(j)-1)}, 
+        D: {math.floor(math.sqrt(j))-1}""")
+
+
+for j in range(2,30):
+    #print("n:", j)
+    stars5(j)
+
+
 
 def stars6 ( N ) :
   for i in range (N) :
@@ -39,8 +55,8 @@ def stars7(n):
 def stars8(n):
     print("*")
     if n > 1 :
-    for j in range(n):
-        print("*")
+        for j in range(n):
+            print("*")
 
 def stars9 ( n ) :
   while n > 1 :
@@ -49,8 +65,11 @@ def stars9 ( n ) :
 
 def stars10(n):
     if n < 2:
-        return 1
-    return 3*stars10(n-1)
+        print("*") 
+        return
+    stars10(n-1)
+    stars10(n-1)
+    stars10(n-1)
 
 def stars11(n):
     if n % 2 == 0:
@@ -72,3 +91,7 @@ def stars13(n):
     s = n + r * r
     for i in range(s):
         print("*")
+
+
+    print(j)
+    stars5(j)
