@@ -55,7 +55,7 @@ class Car:
     def PickMove(self, world, allowed_moves):
         if self.driver is None:
             return None
-        return self.driver.PickMove(world, allowed_moves)
+        return self.driver.PickMove(self, world, allowed_moves)
 
 class Track:
     def __init__(self, width: int, height: int, road_mask: List[List[bool]], start_vertices: List[Vertex], finish_line: Segment):
