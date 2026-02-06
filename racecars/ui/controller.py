@@ -37,7 +37,7 @@ class Controller:
         start_time = None
         if tracker is not None and tracker.enabled:
             start_time = time.perf_counter()
-        target = car.PickMove(world, targets)
+        target = car.PickMove(world, options)
         if start_time is not None:
             elapsed = time.perf_counter() - start_time
             tracker.record(car_id, elapsed)
