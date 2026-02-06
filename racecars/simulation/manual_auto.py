@@ -8,7 +8,7 @@ class MouseAuto(AutoAuto):
     def SetTarget(self, target):
         self._queued_target = target
 
-    def PickMove(self, world, allowed_moves):
+    def PickMove(self, auto, world, allowed_moves):
         if self._queued_target is None:
             return None
         target = self._queued_target
