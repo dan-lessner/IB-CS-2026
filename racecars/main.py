@@ -343,8 +343,8 @@ def main():
 
     # Generate a simple track
     track = generate_track(
-        width=params.width,
-        height=params.height,
+        width=params.width - 2,
+        height=params.height - 2,
         players=params.players,
         track_width_mean=params.track_width_mean,
         track_width_var=params.track_width_var,
@@ -353,8 +353,28 @@ def main():
         seed=params.seed
     )
 
+    # add bounderies
+    track.width = params.width
+    track.height = params.height
+    # vertical
+    track.road_mask.insert(0, [False for x in range(params.height)])
+    track.road_mask.append([False for x in range(params.height)])
+    #horizontal
+    for x in range(params.width):
+        track.road_mask[x].insert(0, False)
+        track.road_mask[x].append(False)
+
+    # move start and finish lines
+    track.start_line.start.x = 1
+    track.start_line.end.x = 1
+    track.finish_line.start.x = params.width - 1
+    track.finish_line.end.x = params.width - 1
+
     # Create cars
     cars = create_cars_for_track(track, params.players)
+    # move cars to start properly
+    for car in cars:
+        car.pos.x = 1
     _assign_drivers(cars, controllers, scripts)
 
     # Initialize game state
