@@ -1,4 +1,6 @@
-# Graded Exercises for Autonomous Car Scripts
+# Aničko, read me!!
+
+# Exercises for Autonomous Car Scripts
 
 This file contains a graded sequence of exercises designed to guide students from trivial behaviors to more advanced movement strategies. Each exercise includes a short description, a collapsed hints section, and a further collapsed "detail-summary" with a small critical code snippet (didactic, not a full implementation).
 
