@@ -69,6 +69,63 @@ def get_all_targets(options):
     return targets
 
 
+def get_ordered_targets_and_validity(game_state, car_id: int):
+    # Return a fixed-order list of 9 vertices (ax,ay from -1..1 nested)
+    # and a corresponding 9-element boolean list indicating validity.
+    car = game_state.cars[car_id]
+
+    # If car is penalized, only allow staying in place
+    if car.penalty_turns_left > 0:
+        return [car.pos], [True]
+
+    targets = []
+    validity = []
+
+    ax = -1
+    while ax <= 1:
+        ay = -1
+        while ay <= 1:
+            new_vx = car.vel.vx + ax
+            new_vy = car.vel.vy + ay
+            target_x = car.pos.x + new_vx
+            target_y = car.pos.y + new_vy
+            target_vertex = Vertex(target_x, target_y)
+            finish_vertex = game_state.track.finish_vertex_for_segment(car.pos, target_vertex)
+
+            if finish_vertex is not None:
+                target = finish_vertex
+                segment_valid = game_state.track.segment_is_valid(car.pos, finish_vertex)
+            else:
+                target = target_vertex
+                if not _target_in_bounds(game_state, target.x, target.y):
+                    segment_valid = False
+                else:
+                    segment_valid = game_state.track.segment_is_valid(car.pos, target)
+
+            occupied = _target_is_occupied(game_state, car_id, target.x, target.y)
+            valid = segment_valid and (not occupied)
+
+            targets.append(target)
+            validity.append(valid)
+
+            ay += 1
+        ax += 1
+
+    # If none are valid (collision), return only current position marked valid
+    any_valid = False
+    idx = 0
+    while idx < len(validity):
+        if validity[idx]:
+            any_valid = True
+            break
+        idx += 1
+
+    if not any_valid:
+        return [car.pos], [True]
+
+    return targets, validity
+
+
 def find_option_for_target(options, target: Vertex):
     index = 0
     while index < len(options):

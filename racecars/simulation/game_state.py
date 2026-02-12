@@ -52,10 +52,11 @@ class Car:
     def SetDriver(self, driver):
         self.driver = driver
 
-    def PickMove(self, world, allowed_moves):
+    def PickMove(self, world, targets, validity):
         if self.driver is None:
             return None
-        return self.driver.PickMove(self, world, allowed_moves)
+        # Forward car instance, world, ordered targets and validity flags to driver
+        return self.driver.PickMove(self, world, targets, validity)
 
 class Track:
     def __init__(self, width: int, height: int, road_mask: List[List[bool]], start_vertices: List[Vertex], finish_line: Segment):

@@ -17,8 +17,8 @@
   - `GetName(self) -> str`
     - Vraci jmeno programovaneho auta.
     - Pokud vrati prazdny retezec, pouzije se nazev souboru bez pripony.
-  - `PickMove(self, world, allowed_moves) -> Vertex`
-    - `allowed_moves` je seznam moznych vrcholu (Vertex), vcetne nevalidnich.
+  - `PickMove(self, world, targets, validity) -> Vertex`
+    - `targets` je seznam vrcholu (po rade pro ax=-1..1, ay=-1..1). `validity` je 9-prvkovy seznam boolu, kde `True` znaci dostupny vertex. Pokud doslo ke kolizi, predava se jediny vertex (soucasna poloha) a je oznacen jako validni.
     - Metoda musi vratit jeden z prvku `allowed_moves`.
     - Pokud vrati `None`, pouzije se stredova volba (akcelerace 0,0) a tah pokracuje.
     - Pokud vrati jinou hodnotu, auto zvoli cekani na miste (zadna zmena rychlosti).

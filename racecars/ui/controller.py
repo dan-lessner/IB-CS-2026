@@ -1,6 +1,6 @@
 import time
 from simulation.game_state import GameState, Vertex
-from simulation.move_generator import get_move_options, get_all_targets, find_option_for_target
+from simulation.move_generator import get_move_options, get_ordered_targets_and_validity, find_option_for_target
 from simulation.turn_logic import TurnLogic
 from simulation.script_api import build_world_state
 
@@ -30,16 +30,14 @@ class Controller:
 
         car_id = self.game_state.current_player_idx
         options = get_move_options(self.game_state, car_id)
-        targets = get_all_targets(options)
+        targets, validity = get_ordered_targets_and_validity(self.game_state, car_id)
         world = build_world_state(self.game_state)
         car = self.game_state.cars[car_id]
         tracker = self.game_state.performance
         start_time = None
         if tracker is not None and tracker.enabled:
             start_time = time.perf_counter()
-        target = car.PickMove(world, options)
-        if type(target) is not Vertex and target is not None:
-            raise Exception(f"Function PickMove must return Vertex or None")
+        target = car.PickMove(world, targets, validity)
         if start_time is not None:
             elapsed = time.perf_counter() - start_time
             tracker.record(car_id, elapsed)

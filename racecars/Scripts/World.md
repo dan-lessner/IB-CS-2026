@@ -1,8 +1,12 @@
-# World object in controller scripts
+# World and auto objects in controller scripts
 
-The `world` argument passed to `Auto.PickMove(self, world, allowed_moves)` is a
-`WorldState` snapshot created in `simulation/script_api.py`. It is read-only;
-changing it will not affect the game.
+The `world` argument passed to `Auto.PickMove(self, auto, world, allowed_moves)`
+is a `WorldState` snapshot created in `simulation/script_api.py`. It is
+read-only; changing it will not affect the game.
+
+The `auto` argument is the `CarInfo` object for the car whose script is being
+called. It is the same type and structure as the objects inside
+`world.cars`. Treat it as read-only.
 
 **WorldState fields**
 - `world.road`: 2D list of `bool`. Access with `world.road[x][y]` to check if a
@@ -19,12 +23,18 @@ changing it will not affect the game.
 - `car.pos`: `Vertex` position with `x` and `y`.
 - `car.vel`: `Vector2i` velocity with `vx` and `vy`.
 
+**Auto parameter (your car)**
+- `auto.id`
+- `auto.name`
+- `auto.pos.x`, `auto.pos.y`
+- `auto.vel.vx`, `auto.vel.vy`
+
 **Access examples**
 ```python
 from simulation.script_api import AutoAuto
 
 class Auto(AutoAuto):
-    def PickMove(self, world, allowed_moves):
+    def PickMove(self, auto, world, targets, validity):
         # Check a road cell.
         if world.road[10][5]:
             pass
@@ -35,15 +45,57 @@ class Auto(AutoAuto):
             y = car.pos.y
             speed = abs(car.vel.vx) + abs(car.vel.vy)
 
-        # Find your car by name (if you return a name in GetName()).
-        me = None
-        for car in world.cars:
-            if car.name == self.GetName():
-                me = car
-                break
+        # Your car is provided as `auto`.
+        my_x = auto.pos.x
+        my_y = auto.pos.y
 
         # Pick one of the provided targets.
         if allowed_moves:
             return allowed_moves[0]
         return None
+```
+
+**Create and run your own primitive script (step by step)**
+1. Copy `Scripts\RandomAuto.py` to a new file, for example `Scripts\MyAuto.py`.
+2. Open `Scripts\MyAuto.py`.
+3. Keep the class name as `Auto` and update the name:
+   `def GetName(self): return "My Auto"`
+4. Replace `PickMove` with a basic rule like: "move left if it doesn't collide
+   with another car, otherwise take the first allowed move."
+5. Save the file.
+6. Open a terminal and go to the game folder:
+   `cd personal-playground\\racecars`
+7. Run the game:
+   `python main.py`
+8. In the controller selection dialog, choose `MyAuto` for a player.
+9. Start the game.
+
+**Primitive example (move left if it doesn't collide)**
+```python
+from simulation.script_api import AutoAuto
+
+class Auto(AutoAuto):
+    def GetName(self) -> str:
+        return "My Auto"
+
+    def PickMove(self, auto, world, targets, validity):
+        if not allowed_moves:
+            return None
+
+        target_left = None
+        for target in allowed_moves:
+            if target.x < auto.pos.x:
+                target_left = target
+                break
+
+        if target_left is not None and not _target_occupied(world, auto, target_left):
+            return target_left
+
+        return allowed_moves[0]
+
+def _target_occupied(world, auto, target):
+    for car in world.cars:
+        if car.id != auto.id and car.pos.x == target.x and car.pos.y == target.y:
+            return True
+    return False
 ```

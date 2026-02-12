@@ -5,12 +5,18 @@ class AutoAuto:
     def GetName(self) -> str:
         return ""
 
-    def PickMove(self, world, allowed_moves):
-        if allowed_moves is None:
+    def PickMove(self, auto, world, targets, validity):
+        # Default implementation: pick first valid target
+        if targets is None or validity is None:
             return None
-        if len(allowed_moves) == 0:
+        if len(targets) == 0:
             return None
-        return allowed_moves[0]
+        index = 0
+        while index < len(targets):
+            if index < len(validity) and validity[index]:
+                return targets[index]
+            index += 1
+        return None
 
 
 class CarInfo:
