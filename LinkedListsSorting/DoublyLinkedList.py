@@ -28,16 +28,6 @@ class DoublyLinkedList(SinglyLinkedList.LinkedList):
             last = last.next
         last.next, new_node.prev = new_node, last
 
-    def reverse(self):
-        prev, curr = None, self.head
-        while curr:
-            next = curr.next
-            curr.next = prev
-            prev = curr
-            curr = next
-        self.head = prev
-        
-
     def remove_node(self, node):
         """Removes the given node from the list."""
         if not self.head or not node:
@@ -58,26 +48,48 @@ class DoublyLinkedList(SinglyLinkedList.LinkedList):
             print(current.data, end=" <--> ")
             current = current.next
         print("None")
-    def len(self):
-        count = 0
-        current = self.head
-        while current:
-            count+=1
-            current = current.next
-        return count
-    def is_empty(self):
-        if self.head == None:
-            return True
+
+    def concatenate(list1, list2):
+        if not list1.head:  
+            return list2
+        if not list2.head:  
+            return list1
+
+        # Find the last node of the first list
+        last_node = list1.head
+        while last_node.next:
+            last_node = last_node.next
+
+    # Link the last node of the first list to the head of the second list
+        last_node.next, list2.head.prev = list2.head, last_node
+        return list1
+
+    def swap(self, node1Index, node2Index):
+        # find nodes based on Index
+        node1 = self.head
+        for x in range(node1Index):
+            node1 = node1.next
+        node2 = self.head
+        for x in range(node2Index):
+            node2 = node2.next
+
+        # temporary definitions
+        prev, next = node1.prev, node2.next
+
+        # if first node is first, point second node nowhere and make it self.head
+        if not node1.is_first(): 
+            prev.next, node2.prev = node2, prev
         else:
-            return False
-    def by_index(self, index):
-        curr_index = 0
-        current = self.head
-        while current:
-            if curr_index == index:
-                return current.data
-            curr_index +=1
-            current = current.next
+            node2.prev, self.head = None, node2
+
+        # if second node is last, point first node nowhere
+        if not node2.is_last(): 
+            next.prev, node1.next = node1, next
+        else:
+            node1.next = None
+
+        # swap inner pointers
+        node1.prev, node2.next = node2, node1
 
 # When imported, does not run the example usage so it doesnt create a mess
 if __name__ == "__main__":
@@ -86,6 +98,8 @@ if __name__ == "__main__":
     ll.append(1)
     ll.append(2)
     ll.append(3)
+    ll.append(4)
+    ll.append(5)
     ll.print_list()  # Output: 1 -> 2 -> 3 -> None
 
     node_to_remove = ll.head.next  # Node with value 2
