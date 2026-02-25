@@ -5,12 +5,8 @@ from simulation.game_state import Vertex, Vector2i
 
 _LOGGER = logging.getLogger("racecars.script_api")
 
-
 class AutoAuto:
-    def __init__(self):
-        self.logger = _LOGGER
-
-    def SetLogger(self, logger):
+    def __init__(self, logger: logging.Logger = _LOGGER):
         self.logger = logger
 
     def GetName(self) -> str:
@@ -28,7 +24,6 @@ class AutoAuto:
             if index < len(validity) and validity[index]:
                 return target
         return None
-
 
 class CarInfo:
     def __init__(self, car_id: int, name: str, pos: Vertex, vel: Vector2i):

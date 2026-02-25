@@ -7,7 +7,7 @@ import logging
 import random
 import pygame
 from simulation.game_state import GameState
-from ui.controller import Controller
+from simulation.controller import Controller
 
 _LOGGER = logging.getLogger("racecars.renderer")
 

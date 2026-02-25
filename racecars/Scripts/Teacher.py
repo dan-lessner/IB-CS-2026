@@ -3,9 +3,11 @@ from simulation.script_api import AutoAuto
 
 
 class Auto(AutoAuto):
-    def __init__(self) -> None:
+    def __init__(self, track) -> None:
         super().__init__()
+        self.track = track
         self.logger.info("Teacher script initialized.")
+        self.logger.info("The track is this big: %d, %d", self.track.width, self.track.height)
 
     def GetName(self) -> str:
         return "Driver with a compass"

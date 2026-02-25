@@ -9,15 +9,7 @@ import random
 
 _LOGGER = logging.getLogger("racecars.game_state")
 
-_ADJECTIVES = [
-    "Red", "Blue", "Green", "Yellow", "Silver", "Black",
-    "Swift", "Brave", "Wild", "Mighty", "Fierce", "Lucky"
-]
 
-_NOUNS = [
-    "Comet", "Falcon", "Tiger", "Eagle", "Rocket", "Panther",
-    "Wolf", "Viper", "Storm", "Blaze", "Arrow", "Bolt"
-]
 class Vector2i:
     def __init__(self, x: int = 0, y: int = 0):
         self.x = int(x)
@@ -64,7 +56,7 @@ class Segment:
         return f"Segment(start={self.start}, end={self.end})"
 
 class Car:
-    def __init__(self, car_id: int, name: str, pos: Vertex, vel: Vector2i):
+    def __init__(self, car_id: int, name: str, pos: Vertex, vel: Vector2i = Vector2i(0, 0), driver = None, logger: logging.Logger = _LOGGER):
         # One Car object stores everything needed to replay and score a single driver.
         self.id = car_id
         self.name = name
@@ -73,24 +65,24 @@ class Car:
         self.penalty = 0  # Number of penalty turns remaining
         self.path: List[Segment] = []  # Path history for replay/logging
         self.trail: List[Tuple[int, int]] = []  # Initialize trail as an empty list
-        self.driver = None
-        self.logger = None
+        self.driver = driver
+        self.logger = logger
         self._missing_driver_warning_emitted = False
 
     def __repr__(self):
         return f"Car(id={self.id}, name={self.name}, pos={self.pos}, vel={self.vel}, penalty={self.penalty})"
 
-    def SetDriver(self, driver):
+    def deleteSetDriver(self, driver):
         self.driver = driver
         self._missing_driver_warning_emitted = False
+
+    def SetLogger(self, logger: logging.Logger):
+        self.logger = logger
 
     def PickMove(self, world, targets, validity):
         if self.driver is None:
             if not self._missing_driver_warning_emitted:
-                logger = self.logger
-                if logger is None:
-                    logger = _LOGGER
-                logger.warning("Car '%s' has no driver assigned. Returning None move.", self.name)
+                self.logger.warning("Car '%s' has no driver assigned. Returning None move.", self.name)
                 self._missing_driver_warning_emitted = True
             return None
         self._missing_driver_warning_emitted = False
@@ -424,38 +416,3 @@ class GameState:
             self.winners = winners
             self.finish_triggered = True
             self.finish_after_player_idx = self.current_player_idx
-
-def create_cars_for_track(track: Track, players: int) -> List[Car]:
-    # Start order is randomized so scripts do not always get the same starting slot.
-    start_positions: List[Vertex] = list(track.start_vertices)
-
-    _shuffle_vertices(start_positions)
-
-    count = players
-    if count > len(start_positions):
-        count = len(start_positions)
-
-    names = _generate_unique_names(count)
-    cars: List[Car] = []
-    for index in range(count):
-        cars.append(Car(index, names[index], start_positions[index], Vector2i(0, 0)))
-    return cars
-
-def _shuffle_vertices(vertices: List[Vertex]):
-    for i in range(len(vertices) - 1, 0, -1):
-        j = random.randint(0, i)
-        temp = vertices[i]
-        vertices[i] = vertices[j]
-        vertices[j] = temp
-
-def _generate_unique_names(count: int) -> List[str]:
-    adjectives = _ADJECTIVES.copy()
-    nouns = _NOUNS.copy()
-    random.shuffle(adjectives)
-    random.shuffle(nouns)
-
-    names = []
-    for i in range(count):
-        names.append(adjectives[i] + " " + nouns[i])
-
-    return names

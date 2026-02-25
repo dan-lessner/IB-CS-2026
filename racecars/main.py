@@ -3,16 +3,19 @@
 This file wires together setup, track generation, driver loading, and the UI loop.
 """
 
+from asyncio.log import logger
 import logging
 import os
 import sys
-from simulation.game_state import GameState, create_cars_for_track
+import random
+from typing import List
+from simulation.game_state import GameState, Car, Track
 from simulation.track_generator import generate_track
 from simulation.params import GameParams
 from simulation.manual_auto import MouseAuto
 from simulation.script_loader import load_scripts_from_folder, load_auto_class
-from simulation.logging_utils import setup_logging, get_car_logger
 from simulation.performance import PerformanceTracker
+from ui.logging_utils import setup_logging, sanitize_logger_name
 from ui.renderer import Renderer
 from ui.setup_dialog import SetupDialog
 from ui.controller_dialog import ControllerDialog
@@ -232,11 +235,6 @@ def _adjust_controllers_to_players(controllers, players):
         result.extend(["mouse"] * (players - len(result)))
     return result
 
-
-def _copy_list(items):
-    return list(items)
-
-
 def _controller_options(script_names):
     return ["Mouse"] + list(script_names)
 
@@ -253,13 +251,6 @@ def _is_hidden_script(name: str) -> bool:
     if name is None:
         return False
     return name.lower() == "randomauto"
-
-
-def _is_mouse_name(name: str) -> bool:
-    if name is None:
-        return False
-    return name.lower() == "mouse"
-
 
 def _find_script_info(script_infos, name: str):
     if name is None:
@@ -280,93 +271,63 @@ def _strip_py_extension(name: str) -> str:
     return name
 
 
-def _assign_drivers(cars, controllers, script_infos):
-    # Convert each controller name into a concrete driver object for that car.
-    for index, car in enumerate(cars):
+def _create_cars_for_track(track: Track, players: int, controllers, script_infos) -> List[Car]:
+    # Start order is randomized so scripts do not always get the same starting slot.
+    start_positions = list(track.start_vertices)
+    random.shuffle(start_positions)
+
+    count = players
+    if count > len(start_positions):
+        count = len(start_positions)
+
+    # generate random names
+    ADJECTIVES = ["Red", "Blue", "Green", "Yellow", "Silver", "Black",
+    "Swift", "Brave", "Wild", "Mighty", "Fierce", "Lucky"]
+    NOUNS = ["Comet", "Falcon", "Tiger", "Eagle", "Rocket", "Panther",
+    "Wolf", "Viper", "Storm", "Blaze", "Arrow", "Bolt"]
+    random.shuffle(ADJECTIVES)
+    random.shuffle(NOUNS)
+    names = []
+    for i in range(count):
+        names.append(ADJECTIVES[i] + " " + NOUNS[i])
+
+    cars: List[Car] = []
+    for index in range(count):
         controller_name = "mouse"
         if index < len(controllers):
             controller_name = controllers[index]
 
-        if _is_mouse_name(controller_name):
-            car.SetDriver(MouseAuto())
-            _attach_car_logger(car)
-        else:
-            info = _find_script_info(script_infos, controller_name)
-            if info is None:
-                _LOGGER.warning(
-                    "Controller '%s' was not found. Falling back to mouse for car %s.",
-                    controller_name,
-                    car.id + 1
-                )
-                car.SetDriver(MouseAuto())
-                _attach_car_logger(car)
-            else:
-                auto_class = load_auto_class(info)
+        driver = MouseAuto()
+        logger = logging.getLogger("racecars.car." + sanitize_logger_name("Mouse") + ".id_" + str(index + 1))
+        if controller_name.lower() != "mouse":
+            try:
+                script_info = _find_script_info(script_infos, controller_name)
+                if script_info is None:
+                    raise ValueError("Controller '%s' was not found. Falling back to mouse for car %s." % (controller_name, index + 1))   
+                auto_class = load_auto_class(script_info)
                 if auto_class is None:
-                    _LOGGER.warning(
-                        "Failed to load script '%s'. Falling back to mouse for car %s.",
-                        info.name,
-                        car.id + 1
-                    )
-                    car.SetDriver(MouseAuto())
-                    _attach_car_logger(car)
-                else:
-                    try:
-                        driver = auto_class()
-                    except Exception as ex:
-                        _LOGGER.exception(
-                            "Script '%s' raised during initialization (%s: %s). Falling back to mouse for car %s.",
-                            info.name,
-                            type(ex).__name__,
-                            ex,
-                            car.id + 1
-                        )
-                        car.SetDriver(MouseAuto())
-                        _attach_car_logger(car)
-                        continue
-                    car.SetDriver(driver)
-                    _attach_car_logger(car)
-                    name = ""
-                    if hasattr(driver, "GetName"):
-                        try:
-                            name = driver.GetName()
-                        except Exception as ex:
-                            car.logger.exception(
-                                "GetName() failed for script '%s' (%s: %s). Using script file name as fallback.",
-                                info.name,
-                                type(ex).__name__,
-                                ex
-                            )
-                    if name == "":
-                        name = info.name
-                    car.name = name
-                    _attach_car_logger(car)
+                    raise ValueError("Failed to load script '%s'. Falling back to mouse for car %s." % (script_info.name, index + 1))
+                driver = auto_class(track)
+                try:
+                    name = driver.GetName()
+                except Exception as ex:
+                    car.logger.exception("GetName() failed for script '%s' (%s: %s). Using script file name as fallback.", script_info.name, type(ex).__name__, ex)
+                    name = script_info.name
+                names[index] = name
+                logger = logging.getLogger("racecars.car." + sanitize_logger_name(script_info.name) + ".id_" + str(index + 1))
+            except Exception as ex:
+                _LOGGER.exception("Script '%s' raised during initialization (%s: %s). Falling back to mouse for car %s.", script_info.name, type(ex).__name__, ex, index + 1)
 
+        # finally create the car        
+        cars.append(Car(index, names[index], start_positions[index], driver = driver, logger = logger))
 
-def _attach_car_logger(car):
-    car_logger = get_car_logger(car.name, car.id)
-    car.logger = car_logger
-    if car.driver is None:
-        return
-    if hasattr(car.driver, "SetLogger"):
-        try:
-            car.driver.SetLogger(car_logger)
-            return
-        except Exception as ex:
-            _LOGGER.exception(
-                "Driver for car '%s' failed while setting logger (%s: %s). Falling back to direct attribute assignment.",
-                car.name,
-                type(ex).__name__,
-                ex
-            )
-    setattr(car.driver, "logger", car_logger)
-
+    return cars
 
 def _print_console_help():
     print("Console parameters:")
     print("  --players N or players=N")
     print("  --controllers list (example: --controllers mouse,Adam,Bara)")
-    
+    print("")
     print("  --width N or width=N")
     print("  --height N or height=N")
     print("  --track_width_mean N or track_width_mean=N")
@@ -374,12 +335,12 @@ def _print_console_help():
     print("  --turn_sharpness N or turn_sharpness=N")
     print("  --turn_density N or turn_density=N")
     print("  --seed N or --seed None")
-
+    print("")
     print("  --supress-log (disable all logging)")
     print("  --log-path PATH or log_path=PATH")
     print("  --log-level LEVEL (DEBUG|INFO|WARNING|ERROR|CRITICAL)")
     print("  --measure or measure=1")
-
+    print("")
     print("  --no-gui (start game directly)")
     print("  --list-params (show this list)")
 
@@ -468,8 +429,7 @@ def main():
     )
 
     # Create cars
-    cars = create_cars_for_track(track, params.players)
-    _assign_drivers(cars, controllers, scripts)
+    cars = _create_cars_for_track(track, params.players, controllers, scripts)
 
     # Initialize game state
     game_state = GameState(track=track, cars=cars)
