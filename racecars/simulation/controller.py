@@ -53,6 +53,8 @@ class Controller:
         pickmove_failed = False
         try:
             target = car.PickMove(world, targets, validity)
+            if not isinstance(target, Vertex):
+                raise ValueError(f"PickMove() returned an invalid target of type {type(target).__name__}.")
         except Exception as ex:
             pickmove_failed = True
             car.logger.exception(
