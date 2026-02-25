@@ -46,6 +46,17 @@
   - pouzije se standardni pocet hracu z parametru hry
   - vsichni hraci jsou Mouse
 
+## Logging
+- Logovani pouziva standardni Python modul `logging`.
+- Default: zapis do konzole.
+- Parametry:
+  - `--supress-log`: vypne vsechny logy.
+  - `--log-path PATH`: pridat zapis do souboru.
+  - `--log-level LEVEL`: minimalni uroven (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+- Kazde auto dostane vlastni logger podle jmena (a id), napr. `racecars.car.<name>.id_<n>`.
+- Skript muze logovat pres `self.logger` (instance `Auto`) nebo `auto.logger` (predany objekt auta).
+- Detailni popis je v `logging.md`.
+
 ## Volani skriptu
 - Skript se vola kazdy tick pouze pro auto, ktere je na tahu.
 - Seznam `allowed_moves` generuje hra (stejne jako pro klikaci ovladani).

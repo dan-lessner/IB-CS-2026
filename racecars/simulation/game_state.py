@@ -1,5 +1,13 @@
+"""Core data model for the racing simulation.
+
+The rest of the project reads and updates these classes while playing turns.
+"""
+
 from typing import List, Tuple
+import logging
 import random
+
+_LOGGER = logging.getLogger("racecars.game_state")
 
 _ADJECTIVES = [
     "Red", "Blue", "Green", "Yellow", "Silver", "Black",
@@ -10,22 +18,42 @@ _NOUNS = [
     "Comet", "Falcon", "Tiger", "Eagle", "Rocket", "Panther",
     "Wolf", "Viper", "Storm", "Blaze", "Arrow", "Bolt"
 ]
+class Vector2i:
+    def __init__(self, x: int = 0, y: int = 0):
+        self.x = int(x)
+        self.y = int(y)
 
-class Vertex:
-    def __init__(self, x: int, y: int):
-        self.x = x
-        self.y = y
+    def __add__(self, other):
+        if not isinstance(other, Vector2i):
+            return NotImplemented
+        if isinstance(self, Vertex) or isinstance(other, Vertex):
+            return Vertex(self.x + other.x, self.y + other.y)
+        return Vector2i(self.x + other.x, self.y + other.y)
 
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __sub__(self, other):
+        if not isinstance(other, Vector2i):
+            return NotImplemented
+        return Vector2i(self.x - other.x, self.y - other.y)
+
+    def __rsub__(self, other):
+        if not isinstance(other, Vector2i):
+            return NotImplemented
+        return Vector2i(other.x - self.x, other.y - self.y)
+
+    def __eq__(self, other):
+        if not isinstance(other, Vector2i):
+            return NotImplemented
+        return self.x == other.x and self.y == other.y
+
+    def __repr__(self):
+        return f"Vector2i(x={self.x}, y={self.y})"
+
+class Vertex(Vector2i):
     def __repr__(self):
         return f"Vertex(x={self.x}, y={self.y})"
-
-class Vector2i:
-    def __init__(self, vx: int, vy: int):
-        self.vx = vx
-        self.vy = vy
-
-    def __repr__(self):
-        return f"Vector2i(vx={self.vx}, vy={self.vy})"
 
 class Segment:
     def __init__(self, start: Vertex, end: Vertex):
@@ -37,29 +65,41 @@ class Segment:
 
 class Car:
     def __init__(self, car_id: int, name: str, pos: Vertex, vel: Vector2i):
+        # One Car object stores everything needed to replay and score a single driver.
         self.id = car_id
         self.name = name
         self.pos = pos
         self.vel = vel  # Velocity vector
-        self.penalty_turns_left = 0  # Number of penalty turns remaining
+        self.penalty = 0  # Number of penalty turns remaining
         self.path: List[Segment] = []  # Path history for replay/logging
         self.trail: List[Tuple[int, int]] = []  # Initialize trail as an empty list
         self.driver = None
+        self.logger = None
+        self._missing_driver_warning_emitted = False
 
     def __repr__(self):
-        return f"Car(id={self.id}, name={self.name}, pos={self.pos}, vel={self.vel}, penalty_turns_left={self.penalty_turns_left})"
+        return f"Car(id={self.id}, name={self.name}, pos={self.pos}, vel={self.vel}, penalty={self.penalty})"
 
     def SetDriver(self, driver):
         self.driver = driver
+        self._missing_driver_warning_emitted = False
 
     def PickMove(self, world, targets, validity):
         if self.driver is None:
+            if not self._missing_driver_warning_emitted:
+                logger = self.logger
+                if logger is None:
+                    logger = _LOGGER
+                logger.warning("Car '%s' has no driver assigned. Returning None move.", self.name)
+                self._missing_driver_warning_emitted = True
             return None
+        self._missing_driver_warning_emitted = False
         # Forward car instance, world, ordered targets and validity flags to driver
         return self.driver.PickMove(self, world, targets, validity)
 
 class Track:
     def __init__(self, width: int, height: int, road_mask: List[List[bool]], start_vertices: List[Vertex], finish_line: Segment):
+        # The track is a grid plus start/finish metadata used by movement validation.
         self.width = width
         self.height = height
         self.road_mask = road_mask  # Binary mask indicating road cells
@@ -73,7 +113,8 @@ class Track:
             self.start_line = None
 
     def segment_is_valid(self, p0: Vertex, p1: Vertex) -> bool:
-        # Supercover: check each interval between grid crossings.
+        # We validate a move by sampling every interval between grid-line crossings.
+        # If any sampled interval is off-road, the whole move is invalid.
         dx = p1.x - p0.x
         dy = p1.y - p0.y
         if dx == 0 and dy == 0:
@@ -83,39 +124,32 @@ class Track:
 
         if dx != 0:
             if dx > 0:
-                x = p0.x + 1
-                while x < p1.x:
+                for x in range(p0.x + 1, p1.x):
                     t = (x - p0.x) / dx
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    x += 1
             else:
-                x = p0.x - 1
-                while x > p1.x:
+                for x in range(p0.x - 1, p1.x, -1):
                     t = (x - p0.x) / dx
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    x -= 1
 
         if dy != 0:
             if dy > 0:
-                y = p0.y + 1
-                while y < p1.y:
+                for y in range(p0.y + 1, p1.y):
                     t = (y - p0.y) / dy
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    y += 1
             else:
-                y = p0.y - 1
-                while y > p1.y:
+                for y in range(p0.y - 1, p1.y, -1):
                     t = (y - p0.y) / dy
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    y -= 1
 
         return self._segment_intervals_are_on_road(p0, p1, t_values)
 
     def first_invalid_point_on_segment(self, p0: Vertex, p1: Vertex):
+        # Used after crashes to find roughly where the car left the track.
         dx = p1.x - p0.x
         dy = p1.y - p0.y
         if dx == 0 and dy == 0:
@@ -126,9 +160,8 @@ class Track:
         t_values = self._collect_t_values(p0, p1)
         t_values.sort()
 
-        index = 0
         epsilon = 0.0000001
-        while index < len(t_values) - 1:
+        for index in range(len(t_values) - 1):
             t0 = t_values[index]
             t1 = t_values[index + 1]
             if t1 - t0 > epsilon:
@@ -139,7 +172,6 @@ class Track:
                     x_exit = p0.x + dx * t0
                     y_exit = p0.y + dy * t0
                     return (x_exit, y_exit)
-            index += 1
 
         return None
 
@@ -153,25 +185,21 @@ class Track:
         return self.nearest_inside_vertex_from_point(float(point.x), float(point.y))
 
     def nearest_inside_vertex_from_point(self, x: float, y: float) -> Vertex:
-        # Find the nearest vertex that is inside the track.
+        # After a crash we "snap" the car back to the nearest legal vertex.
         min_dist_sq = None
         candidates: List[Vertex] = []
 
-        vx = 0
-        while vx <= self.width:
-            vy = 0
-            while vy <= self.height:
-                if self._vertex_is_inside(vx, vy):
-                    dx = vx - x
-                    dy = vy - y
+        for vertex_x in range(self.width + 1):
+            for vertex_y in range(self.height + 1):
+                if self._vertex_is_inside(vertex_x, vertex_y):
+                    dx = vertex_x - x
+                    dy = vertex_y - y
                     dist_sq = dx * dx + dy * dy
                     if min_dist_sq is None or dist_sq < min_dist_sq:
                         min_dist_sq = dist_sq
-                        candidates = [Vertex(vx, vy)]
+                        candidates = [Vertex(vertex_x, vertex_y)]
                     elif dist_sq == min_dist_sq:
-                        candidates.append(Vertex(vx, vy))
-                vy += 1
-            vx += 1
+                        candidates.append(Vertex(vertex_x, vertex_y))
 
         if candidates:
             index = random.randint(0, len(candidates) - 1)
@@ -183,6 +211,7 @@ class Track:
         return self._finish_intersection_point(p0, p1) is not None
 
     def _finish_intersection_point(self, p0: Vertex, p1: Vertex):
+        # Handles both vertical and horizontal finish lines.
         fx0 = self.finish_line.start.x
         fy0 = self.finish_line.start.y
         fx1 = self.finish_line.end.x
@@ -226,16 +255,16 @@ class Track:
         fy1 = self.finish_line.end.y
 
         if fx0 == fx1:
-            vy = int(round(y))
-            vy = self._clamp_int(vy, fy0, fy1)
-            return Vertex(fx0, vy)
+            vertex_y = int(round(y))
+            vertex_y = self._clamp_int(vertex_y, fy0, fy1)
+            return Vertex(fx0, vertex_y)
 
-        vx = int(round(x))
-        vx = self._clamp_int(vx, fx0, fx1)
-        return Vertex(vx, fy0)
+        vertex_x = int(round(x))
+        vertex_x = self._clamp_int(vertex_x, fx0, fx1)
+        return Vertex(vertex_x, fy0)
 
     def _sample_point_is_on_road(self, x: float, y: float) -> bool:
-        # Determine whether the point lies on any road cell (boundary inclusive).
+        # A point is considered road if any touching cell is road (boundary inclusive).
         if x < 0 or y < 0 or x > self.width or y > self.height:
             return False
 
@@ -254,16 +283,10 @@ class Track:
         if abs(y - round(y)) < epsilon:
             candidates_y.append(base_y - 1)
 
-        cx_index = 0
-        while cx_index < len(candidates_x):
-            cy_index = 0
-            while cy_index < len(candidates_y):
-                cx = candidates_x[cx_index]
-                cy = candidates_y[cy_index]
+        for cx in candidates_x:
+            for cy in candidates_y:
                 if self._cell_is_road(cx, cy):
                     return True
-                cy_index += 1
-            cx_index += 1
 
         return False
 
@@ -277,35 +300,27 @@ class Track:
 
         if dx != 0:
             if dx > 0:
-                x = p0.x + 1
-                while x < p1.x:
+                for x in range(p0.x + 1, p1.x):
                     t = (x - p0.x) / dx
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    x += 1
             else:
-                x = p0.x - 1
-                while x > p1.x:
+                for x in range(p0.x - 1, p1.x, -1):
                     t = (x - p0.x) / dx
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    x -= 1
 
         if dy != 0:
             if dy > 0:
-                y = p0.y + 1
-                while y < p1.y:
+                for y in range(p0.y + 1, p1.y):
                     t = (y - p0.y) / dy
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    y += 1
             else:
-                y = p0.y - 1
-                while y > p1.y:
+                for y in range(p0.y - 1, p1.y, -1):
                     t = (y - p0.y) / dy
                     if t > 0 and t < 1:
                         t_values.append(t)
-                    y -= 1
 
         return t_values
 
@@ -314,9 +329,8 @@ class Track:
         dy = p1.y - p0.y
         t_values.sort()
 
-        index = 0
         epsilon = 0.0000001
-        while index < len(t_values) - 1:
+        for index in range(len(t_values) - 1):
             t0 = t_values[index]
             t1 = t_values[index + 1]
             if t1 - t0 > epsilon:
@@ -325,7 +339,6 @@ class Track:
                 y_mid = p0.y + dy * t_mid
                 if not self._sample_point_is_on_road(x_mid, y_mid):
                     return False
-            index += 1
 
         return True
 
@@ -336,16 +349,12 @@ class Track:
             return False
         return self.road_mask[cell_x][cell_y]
 
-    def _vertex_is_inside(self, vx: int, vy: int) -> bool:
+    def _vertex_is_inside(self, vertex_x: int, vertex_y: int) -> bool:
         # A vertex is inside if any adjacent cell is road.
-        cell_x = vx - 1
-        while cell_x <= vx:
-            cell_y = vy - 1
-            while cell_y <= vy:
+        for cell_x in range(vertex_x - 1, vertex_x + 1):
+            for cell_y in range(vertex_y - 1, vertex_y + 1):
                 if self._cell_is_road(cell_x, cell_y):
                     return True
-                cell_y += 1
-            cell_x += 1
         return False
 
     def _point_has_road(self, x: int, y: int) -> bool:
@@ -386,6 +395,7 @@ class Track:
 
 class GameState:
     def __init__(self, track: Track, cars: List[Car]):
+        # Global mutable state for one full game session.
         self.track = track
         self.cars = cars
         self.current_player_idx = 0  # Index of the current player
@@ -405,13 +415,10 @@ class GameState:
     def check_game_finished(self):
         # Check if any car would cross the finish line on its current segment.
         winners: List[int] = []
-        index = 0
-        while index < len(self.cars):
-            car = self.cars[index]
-            next_pos = Vertex(car.pos.x + car.vel.vx, car.pos.y + car.vel.vy)
+        for car in self.cars:
+            next_pos = car.pos + car.vel
             if self.track.segment_crosses_finish(car.pos, next_pos):
                 winners.append(car.id)
-            index += 1
 
         if winners:
             self.winners = winners
@@ -419,12 +426,8 @@ class GameState:
             self.finish_after_player_idx = self.current_player_idx
 
 def create_cars_for_track(track: Track, players: int) -> List[Car]:
-    # Shuffle start positions and assign random names.
-    start_positions: List[Vertex] = []
-    index = 0
-    while index < len(track.start_vertices):
-        start_positions.append(track.start_vertices[index])
-        index += 1
+    # Start order is randomized so scripts do not always get the same starting slot.
+    start_positions: List[Vertex] = list(track.start_vertices)
 
     _shuffle_vertices(start_positions)
 
@@ -434,49 +437,25 @@ def create_cars_for_track(track: Track, players: int) -> List[Car]:
 
     names = _generate_unique_names(count)
     cars: List[Car] = []
-    index = 0
-    while index < count:
+    for index in range(count):
         cars.append(Car(index, names[index], start_positions[index], Vector2i(0, 0)))
-        index += 1
     return cars
 
 def _shuffle_vertices(vertices: List[Vertex]):
-    i = len(vertices) - 1
-    while i > 0:
+    for i in range(len(vertices) - 1, 0, -1):
         j = random.randint(0, i)
         temp = vertices[i]
         vertices[i] = vertices[j]
         vertices[j] = temp
-        i -= 1
 
 def _generate_unique_names(count: int) -> List[str]:
-    names: List[str] = []
-    tries = 0
-    while len(names) < count and tries < count * 20:
-        name = _random_car_name()
-        if not _name_in_list(name, names):
-            names.append(name)
-        tries += 1
+    adjectives = _ADJECTIVES.copy()
+    nouns = _NOUNS.copy()
+    random.shuffle(adjectives)
+    random.shuffle(nouns)
 
-    suffix = 1
-    while len(names) < count:
-        base = _random_car_name()
-        name = base + " " + str(suffix)
-        suffix += 1
-        if not _name_in_list(name, names):
-            names.append(name)
+    names = []
+    for i in range(count):
+        names.append(adjectives[i] + " " + nouns[i])
 
     return names
-
-def _random_car_name() -> str:
-    adj_index = random.randint(0, len(_ADJECTIVES) - 1)
-    noun_index = random.randint(0, len(_NOUNS) - 1)
-    return _ADJECTIVES[adj_index] + " " + _NOUNS[noun_index]
-
-def _name_in_list(name: str, names: List[str]) -> bool:
-    index = 0
-    while index < len(names):
-        if names[index] == name:
-            return True
-        index += 1
-    return False

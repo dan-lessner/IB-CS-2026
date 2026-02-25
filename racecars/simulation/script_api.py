@@ -1,21 +1,32 @@
+"""Public API objects that student Auto scripts are expected to use."""
+
+import logging
 from simulation.game_state import Vertex, Vector2i
+
+_LOGGER = logging.getLogger("racecars.script_api")
 
 
 class AutoAuto:
+    def __init__(self):
+        self.logger = _LOGGER
+
+    def SetLogger(self, logger):
+        self.logger = logger
+
     def GetName(self) -> str:
-        return ""
+        return "Why do you insantiate AutoAuto? You should subclass it and override GetName and PickMove."
 
     def PickMove(self, auto, world, targets, validity):
         # Default implementation: pick first valid target
         if targets is None or validity is None:
+            self.logger.warning("PickMove() received targets or validity as None. Returning None.")
             return None
         if len(targets) == 0:
+            self.logger.warning("PickMove() received no targets. Returning None.")
             return None
-        index = 0
-        while index < len(targets):
+        for index, target in enumerate(targets):
             if index < len(validity) and validity[index]:
-                return targets[index]
-            index += 1
+                return target
         return None
 
 
@@ -29,6 +40,7 @@ class CarInfo:
 
 class WorldState:
     def __init__(self, road, start_vertices, finish_vertices, cars):
+        # Snapshot passed to scripts so they can plan their next target.
         self.road = road
         self.start_vertices = start_vertices
         self.finish_vertices = finish_vertices
@@ -36,29 +48,21 @@ class WorldState:
 
 
 def build_world_state(game_state):
+    # Build a copy-only view of the world to avoid scripts mutating engine internals.
     track = game_state.track
     finish_vertices = _finish_vertices_from_line(track.finish_line)
     cars = []
 
-    index = 0
-    while index < len(game_state.cars):
-        car = game_state.cars[index]
-        car_info = CarInfo(car.id, car.name, Vertex(car.pos.x, car.pos.y), Vector2i(car.vel.vx, car.vel.vy))
+    for car in game_state.cars:
+        car_info = CarInfo(car.id, car.name, Vertex(car.pos.x, car.pos.y), Vector2i(car.vel.x, car.vel.y))
         cars.append(car_info)
-        index += 1
 
     start_vertices = _copy_vertices(track.start_vertices)
     return WorldState(track.road_mask, start_vertices, finish_vertices, cars)
 
 
 def _copy_vertices(vertices):
-    result = []
-    index = 0
-    while index < len(vertices):
-        v = vertices[index]
-        result.append(Vertex(v.x, v.y))
-        index += 1
-    return result
+    return [Vertex(v.x, v.y) for v in vertices]
 
 
 def _finish_vertices_from_line(line):
@@ -68,25 +72,13 @@ def _finish_vertices_from_line(line):
 
     if start.x == end.x:
         x = start.x
-        y = start.y
-        step = 1
-        if end.y < start.y:
-            step = -1
-        while True:
+        step = 1 if end.y >= start.y else -1
+        for y in range(start.y, end.y + step, step):
             vertices.append(Vertex(x, y))
-            if y == end.y:
-                break
-            y = y + step
         return vertices
 
     y = start.y
-    x = start.x
-    step = 1
-    if end.x < start.x:
-        step = -1
-    while True:
+    step = 1 if end.x >= start.x else -1
+    for x in range(start.x, end.x + step, step):
         vertices.append(Vertex(x, y))
-        if x == end.x:
-            break
-        x = x + step
     return vertices

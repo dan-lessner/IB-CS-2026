@@ -1,17 +1,27 @@
+"""Main entry point for the racecars game.
+
+This file wires together setup, track generation, driver loading, and the UI loop.
+"""
+
+import logging
 import os
 import sys
 from simulation.game_state import GameState, create_cars_for_track
 from simulation.track_generator import generate_track
 from simulation.params import GameParams
 from simulation.manual_auto import MouseAuto
-from simulation.script_loader import load_scripts_from_folder
+from simulation.script_loader import load_scripts_from_folder, load_auto_class
+from simulation.logging_utils import setup_logging, get_car_logger
 from simulation.performance import PerformanceTracker
 from ui.renderer import Renderer
 from ui.setup_dialog import SetupDialog
 from ui.controller_dialog import ControllerDialog
 
+_LOGGER = logging.getLogger("racecars.main")
+
 
 def _is_int_string(text: str, allow_negative: bool):
+    # Small helper used by both CLI parsing and setup dialogs.
     if text == "":
         return False
     index = 0
@@ -19,10 +29,9 @@ def _is_int_string(text: str, allow_negative: bool):
         if len(text) == 1:
             return False
         index = 1
-    while index < len(text):
-        if not text[index].isdigit():
+    for ch in text[index:]:
+        if not ch.isdigit():
             return False
-        index += 1
     return True
 
 
@@ -41,15 +50,11 @@ def _parse_arg_pair(token: str):
 def _strip_prefix(text: str, prefix: str) -> str:
     if not text.startswith(prefix):
         return text
-    result = ""
-    index = len(prefix)
-    while index < len(text):
-        result = result + text[index]
-        index += 1
-    return result
+    return text[len(prefix):]
 
 
 def _apply_arg_value(params: GameParams, key: str, value: str):
+    # Keep command-line parsing centralized so the rest of the program can trust GameParams.
     if key == "width" and _is_int_string(value, False):
         params.width = int(value)
         return
@@ -88,61 +93,112 @@ def _apply_arg_value(params: GameParams, key: str, value: str):
 
 
 def _apply_console_args(default_params: GameParams):
+    # Parse optional CLI overrides. If none are provided, the GUI flow is used.
     params = default_params.clone()
-    args = []
-    index = 1
-    while index < len(sys.argv):
-        args.append(sys.argv[index])
-        index += 1
+    args = sys.argv[1:]
 
-    index = 0
     provided_any = False
     start_without_gui = False
     list_params = False
     controllers_text = None
-    while index < len(args):
-        token = args[index]
+    suppress_log = False
+    log_path = None
+    log_level = "INFO"
+    skip_next = False
+    for index, token in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+        next_token = None
+        has_next = index + 1 < len(args)
+        if has_next:
+            next_token = args[index + 1]
+        if token == "--supress-log" or token == "--suppress-log":
+            if has_next and not next_token.startswith("--"):
+                suppress_log = _is_true_text(next_token)
+                skip_next = True
+            else:
+                suppress_log = True
+            continue
         if token == "--no-gui" or token == "--start":
             start_without_gui = True
-            index += 1
             continue
         if token == "--measure":
             params.measure_performance = True
             provided_any = True
-            index += 1
             continue
         if token == "--list-params" or token == "--help-params":
             list_params = True
-            index += 1
             continue
         key, value = _parse_arg_pair(token)
         if key is not None:
+            if _is_suppress_log_key(key):
+                suppress_log = _is_true_text(value)
+                continue
+            if _is_log_path_key(key):
+                log_path = value
+                continue
+            if _is_log_level_key(key):
+                log_level = value
+                continue
             if key == "controllers":
                 controllers_text = value
                 provided_any = True
-                index += 1
                 continue
             _apply_arg_value(params, key, value)
             provided_any = True
-            index += 1
             continue
 
-        if token.startswith("--") and index + 1 < len(args):
+        if token.startswith("--") and has_next:
             key = _strip_prefix(token, "--")
-            value = args[index + 1]
+            value = next_token
+            if _is_log_path_key(key):
+                log_path = value
+                skip_next = True
+                continue
+            if _is_log_level_key(key):
+                log_level = value
+                skip_next = True
+                continue
             if key == "controllers":
                 controllers_text = value
                 provided_any = True
-                index += 2
+                skip_next = True
                 continue
             _apply_arg_value(params, key, value)
             provided_any = True
-            index += 2
+            skip_next = True
             continue
 
-        index += 1
+    return params, provided_any, start_without_gui, list_params, controllers_text, suppress_log, log_path, log_level
 
-    return params, provided_any, start_without_gui, list_params, controllers_text
+
+def _is_suppress_log_key(key: str) -> bool:
+    if key is None:
+        return False
+    lower = key.lower()
+    return lower == "supress-log" or lower == "suppress-log" or lower == "supress_log" or lower == "suppress_log"
+
+
+def _is_log_path_key(key: str) -> bool:
+    if key is None:
+        return False
+    lower = key.lower()
+    return lower == "log-path" or lower == "log_path"
+
+
+def _is_log_level_key(key: str) -> bool:
+    if key is None:
+        return False
+    lower = key.lower()
+    return lower == "log-level" or lower == "log_level"
+
+
+def _is_true_text(value: str) -> bool:
+    if value is None:
+        return False
+    lower = value.strip().lower()
+    return lower == "1" or lower == "true" or lower == "yes" or lower == "on"
 
 
 def _parse_controllers_text(text):
@@ -150,12 +206,10 @@ def _parse_controllers_text(text):
         return None
     items = text.split(",")
     result = []
-    index = 0
-    while index < len(items):
-        name = items[index].strip()
+    for item in items:
+        name = item.strip()
         if name != "":
             result.append(name)
-        index += 1
     return result
 
 
@@ -165,59 +219,33 @@ def _scripts_folder_path():
 
 
 def _collect_script_names(script_infos):
-    names = []
-    index = 0
-    while index < len(script_infos):
-        names.append(script_infos[index].name)
-        index += 1
-    return names
+    return [info.name for info in script_infos]
 
 
 def _default_controllers(script_names):
-    controllers = []
-    index = 0
-    while index < len(script_names) and index < 10:
-        controllers.append(script_names[index])
-        index += 1
-    return controllers
+    return list(script_names[:10])
 
 
 def _adjust_controllers_to_players(controllers, players):
-    result = _copy_list(controllers)
-    while len(result) > players:
-        result.pop()
-    while len(result) < players:
-        result.append("mouse")
+    result = list(controllers[:players])
+    if len(result) < players:
+        result.extend(["mouse"] * (players - len(result)))
     return result
 
 
 def _copy_list(items):
-    result = []
-    index = 0
-    while index < len(items):
-        result.append(items[index])
-        index += 1
-    return result
+    return list(items)
 
 
 def _controller_options(script_names):
-    options = []
-    options.append("Mouse")
-    index = 0
-    while index < len(script_names):
-        options.append(script_names[index])
-        index += 1
-    return options
+    return ["Mouse"] + list(script_names)
 
 
 def _filter_visible_scripts(script_infos):
     visible = []
-    index = 0
-    while index < len(script_infos):
-        info = script_infos[index]
+    for info in script_infos:
         if not _is_hidden_script(info.name):
             visible.append(info)
-        index += 1
     return visible
 
 
@@ -237,54 +265,121 @@ def _find_script_info(script_infos, name: str):
     if name is None:
         return None
     target = name.lower()
-    index = 0
-    while index < len(script_infos):
-        info = script_infos[index]
-        if info.name.lower() == target:
+    target_no_ext = _strip_py_extension(target)
+    for info in script_infos:
+        info_name = info.name.lower()
+        info_file = info.file_name.lower()
+        if info_name == target or info_file == target or info_name == target_no_ext:
             return info
-        index += 1
     return None
 
 
+def _strip_py_extension(name: str) -> str:
+    if name.endswith(".py"):
+        return name[:-3]
+    return name
+
+
 def _assign_drivers(cars, controllers, script_infos):
-    index = 0
-    while index < len(cars):
-        car = cars[index]
+    # Convert each controller name into a concrete driver object for that car.
+    for index, car in enumerate(cars):
         controller_name = "mouse"
         if index < len(controllers):
             controller_name = controllers[index]
 
         if _is_mouse_name(controller_name):
             car.SetDriver(MouseAuto())
+            _attach_car_logger(car)
         else:
             info = _find_script_info(script_infos, controller_name)
             if info is None:
+                _LOGGER.warning(
+                    "Controller '%s' was not found. Falling back to mouse for car %s.",
+                    controller_name,
+                    car.id + 1
+                )
                 car.SetDriver(MouseAuto())
+                _attach_car_logger(car)
             else:
-                driver = info.auto_class()
-                car.SetDriver(driver)
-                name = ""
-                if hasattr(driver, "GetName"):
-                    name = driver.GetName()
-                if name == "":
-                    name = info.name
-                car.name = name
+                auto_class = load_auto_class(info)
+                if auto_class is None:
+                    _LOGGER.warning(
+                        "Failed to load script '%s'. Falling back to mouse for car %s.",
+                        info.name,
+                        car.id + 1
+                    )
+                    car.SetDriver(MouseAuto())
+                    _attach_car_logger(car)
+                else:
+                    try:
+                        driver = auto_class()
+                    except Exception as ex:
+                        _LOGGER.exception(
+                            "Script '%s' raised during initialization (%s: %s). Falling back to mouse for car %s.",
+                            info.name,
+                            type(ex).__name__,
+                            ex,
+                            car.id + 1
+                        )
+                        car.SetDriver(MouseAuto())
+                        _attach_car_logger(car)
+                        continue
+                    car.SetDriver(driver)
+                    _attach_car_logger(car)
+                    name = ""
+                    if hasattr(driver, "GetName"):
+                        try:
+                            name = driver.GetName()
+                        except Exception as ex:
+                            car.logger.exception(
+                                "GetName() failed for script '%s' (%s: %s). Using script file name as fallback.",
+                                info.name,
+                                type(ex).__name__,
+                                ex
+                            )
+                    if name == "":
+                        name = info.name
+                    car.name = name
+                    _attach_car_logger(car)
 
-        index += 1
+
+def _attach_car_logger(car):
+    car_logger = get_car_logger(car.name, car.id)
+    car.logger = car_logger
+    if car.driver is None:
+        return
+    if hasattr(car.driver, "SetLogger"):
+        try:
+            car.driver.SetLogger(car_logger)
+            return
+        except Exception as ex:
+            _LOGGER.exception(
+                "Driver for car '%s' failed while setting logger (%s: %s). Falling back to direct attribute assignment.",
+                car.name,
+                type(ex).__name__,
+                ex
+            )
+    setattr(car.driver, "logger", car_logger)
 
 
 def _print_console_help():
     print("Console parameters:")
+    print("  --players N or players=N")
+    print("  --controllers list (example: --controllers mouse,Adam,Bara)")
+    
     print("  --width N or width=N")
     print("  --height N or height=N")
-    print("  --players N or players=N")
     print("  --track_width_mean N or track_width_mean=N")
     print("  --track_width_var N or track_width_var=N")
     print("  --turn_sharpness N or turn_sharpness=N")
     print("  --turn_density N or turn_density=N")
     print("  --seed N or --seed None")
+
+    print("  --supress-log (disable all logging)")
+    print("  --log-path PATH or log_path=PATH")
+    print("  --log-level LEVEL (DEBUG|INFO|WARNING|ERROR|CRITICAL)")
     print("  --measure or measure=1")
-    print("  --controllers list (example: --controllers mouse,Adam,Bara)")
+
     print("  --no-gui (start game directly)")
     print("  --list-params (show this list)")
 
@@ -298,7 +393,23 @@ def _print_start_instructions():
 
 
 def main():
-    params, provided_any, start_without_gui, list_params, controllers_text = _apply_console_args(GameParams())
+    # 1) Gather parameters and available scripts.
+    (
+        params,
+        provided_any,
+        start_without_gui,
+        list_params,
+        controllers_text,
+        suppress_log,
+        log_path,
+        log_level
+    ) = _apply_console_args(GameParams())
+
+    if suppress_log:
+        setup_logging(log_level, to_console=False, file_path=None)
+    else:
+        setup_logging(log_level, to_console=True, file_path=log_path)
+
     if list_params:
         _print_console_help()
         return
@@ -309,6 +420,7 @@ def main():
     script_names_all = _collect_script_names(scripts)
     script_names_default = _collect_script_names(visible_scripts)
 
+    # 2) Decide who will control each car (mouse vs script).
     controllers = _parse_controllers_text(controllers_text)
     if controllers is not None and len(controllers) == 0:
         controllers = None
@@ -321,6 +433,7 @@ def main():
     if controllers is not None:
         params.players = len(controllers)
 
+    # 3) Optionally run setup dialogs for easier classroom use.
     if not start_without_gui:
         dialog = SetupDialog(params)
         params = dialog.run()
@@ -341,6 +454,7 @@ def main():
             controllers.append("mouse")
             controllers.append("mouse")
 
+    # 4) Build the world and assign the chosen drivers.
     # Generate a simple track
     track = generate_track(
         width=params.width,
@@ -363,6 +477,7 @@ def main():
         log_path = os.path.join(os.path.dirname(__file__), "performance_log.csv")
         game_state.performance = PerformanceTracker(len(cars), log_path)
 
+    # 5) Hand off to renderer; it drives the game loop until window close.
     # Start the renderer
     renderer = Renderer(game_state)
     _print_start_instructions()

@@ -1,3 +1,5 @@
+"""Simple setup window for game parameters before a race starts."""
+
 import pygame
 from simulation.params import GameParams
 
@@ -12,6 +14,7 @@ class SetupDialog:
         self.message = ""
 
     def run(self) -> GameParams:
+        # Modal-style loop: collect values, then return updated params.
         pygame.init()
         self.screen = pygame.display.set_mode((640, 480))
         self.font = pygame.font.SysFont("consolas", 18)
@@ -35,6 +38,7 @@ class SetupDialog:
         return self.params
 
     def _build_fields(self):
+        # Field order controls the layout and keyboard tab order.
         self.fields = [
             _Field("W (width)", "width", str(self.params.width)),
             _Field("H (height)", "height", str(self.params.height)),
@@ -89,11 +93,9 @@ class SetupDialog:
         return True
 
     def _apply_fields_to_params(self):
-        index = 0
-        while index < len(self.fields):
-            field = self.fields[index]
+        # Parse validated text fields back into typed GameParams values.
+        for field in self.fields:
             self._apply_field_value(field)
-            index += 1
 
     def _apply_field_value(self, field):
         if field.key == "seed":
@@ -130,14 +132,13 @@ class SetupDialog:
             self.params.turn_density = value
 
     def _render(self):
+        # Repaint whole form each frame for straightforward UI logic.
         self.screen.fill((230, 230, 230))
         title = self.font.render("Setup", True, (0, 0, 0))
         self.screen.blit(title, (20, 20))
 
         y = 60
-        index = 0
-        while index < len(self.fields):
-            field = self.fields[index]
+        for index, field in enumerate(self.fields):
             label = self.font.render(field.label, True, (0, 0, 0))
             self.screen.blit(label, (20, y))
             box_rect = pygame.Rect(260, y - 4, 160, 26)
@@ -149,7 +150,6 @@ class SetupDialog:
             value_label = self.font.render(field.value, True, (0, 0, 0))
             self.screen.blit(value_label, (265, y))
             y += 34
-            index += 1
 
         self._draw_button(380, 400, 110, 40, "Generate")
         self._draw_button(500, 400, 110, 40, "Start")
@@ -178,12 +178,10 @@ class SetupDialog:
 
     def _field_index_at(self, y):
         top = 60
-        index = 0
-        while index < len(self.fields):
+        for index in range(len(self.fields)):
             field_top = top + index * 34
             if y >= field_top - 4 and y <= field_top + 22:
                 return index
-            index += 1
         return None
 
     def _text_allowed(self, key: str, text: str) -> bool:
@@ -199,22 +197,15 @@ class SetupDialog:
             if len(text) == 1:
                 return False
             index = 1
-        while index < len(text):
-            if not text[index].isdigit():
+        for ch in text[index:]:
+            if not ch.isdigit():
                 return False
-            index += 1
         return True
 
     def _remove_last_char(self, text: str) -> str:
         if text == "":
             return text
-        result = ""
-        index = 0
-        last_index = len(text) - 1
-        while index < last_index:
-            result = result + text[index]
-            index += 1
-        return result
+        return text[:-1]
 
 class _Field:
     def __init__(self, label: str, key: str, value: str):

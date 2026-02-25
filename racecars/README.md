@@ -87,10 +87,6 @@ Projekt je rozdělen do několika samostatných modulů s čistou odpovědností
 - Při přidávání nových pravidel preferujte úpravy v `turn_logic.py` nebo `move_generator.py`.
 - Dokumentaci rozšiřujte přímo u funkcí v modulech a v `specs.md`/`spec_auto.md`.
 
----
-
-Pokud chceš, mohu doplnit diagram toků nebo návrh tříd/typů pro konkrétní část (např. `GameState`).
-
 ## Diagram tříd (Mermaid)
 
 Následující diagram ilustruje hlavní objekty a vztahy mezi nimi.
@@ -165,3 +161,16 @@ Cíl: reprezentovat kompletní stav simulace tak, aby byla snadno serializovatel
 ---
 
 Dokončeno: do souboru jsem přidal diagram tříd a návrh `GameState`. Chceš, abych vytvořil také samostatný soubor s třídou `GameState` (s kostrou třídy), který by šel ihned použít jako reference pro implementaci?
+
+## Logging
+
+Runtime logging is configured in `simulation/logging_utils.py`.
+
+- Default behavior: logs are written to console.
+- CLI options:
+  - `--supress-log` disables all logging output.
+  - `--log-path PATH` also writes logs to a file.
+  - `--log-level LEVEL` controls minimum level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+- Car-specific loggers are named by car identity, e.g. `racecars.car.<name>.id_<n>`.
+
+See `logging.md` for usage examples and details.

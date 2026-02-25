@@ -1,18 +1,9 @@
-# Aničko, read me!!
-
 # Exercises for Autonomous Car Scripts
 
-This file contains a graded sequence of exercises designed to guide students from trivial behaviors to more advanced movement strategies. Each exercise includes a short description, a collapsed hints section, and a further collapsed "detail-summary" with a small critical code snippet (didactic, not a full implementation).
-
-**How to use these exercises**
-- Start with the earliest (1) and only move to the next when your solution is stable.
-- Keep your code simple and readable.
-- The helper function ideas in the code snippet are meant to be copied and adapted into your `PickMove` or equivalent method.
-
----
+This file contains a sequence of exercises from trivial behaviors to more advanced movement strategies. 
 
 ## 1) Move back-and-forth (very simple)
-Goal: Make the car move left-right (or forward-back) repeatedly so it demonstrates basic control.
+Goal: Make the car move left-right (or forward-back) repeatedly to check that you are in control.
 
 <details>
 <summary>Hints</summary>
@@ -47,7 +38,7 @@ def pick_move_bounce_simple(position, direction, collision):
 
 </details>
 
----
+
 
 ## 2) Follow a square or octagon vertex list
 Goal: Drive the car from vertex to vertex around a polygon (square, octagon).
@@ -97,7 +88,7 @@ def pick_nearest_vertex(vertices, position, visited):
 
 </details>
 
----
+
 
 ## 3) Keep direction until collision, then bounce to a random new direction (no acceleration)
 Goal: Maintain current heading; if you hit something, pick a new random heading and continue. Do not accelerate during this process.
@@ -132,7 +123,7 @@ dx, dy = random_unit_step()
 
 </details>
 
----
+
 
 ## 4) Reflect by "angle of incidence" for oblique collisions
 Goal: When moving at an angle and colliding with a wall, compute the reflection direction using the angle of incidence (mirror by wall normal).
@@ -174,7 +165,7 @@ def reflect(d, n):
 
 </details>
 
----
+
 
 ## 5) Detect a collision vs merely touching the wall; optionally avoid it entirely
 Goal: Experiment with two behaviors: (A) just touch walls (stop at contact or slide along them) and (B) proactively avoid them by choosing alternative moves.
@@ -219,7 +210,7 @@ def choose_clear_neighbor(position, neighbors, is_free):
 
 </details>
 
----
+
 
 ## 6) Drive along the wall at speed 1 and find the goal gradually
 Goal: Use wall-following (keep one side touching the wall) moving one cell per turn to slowly explore and eventually find the goal.
@@ -258,7 +249,7 @@ def turn_right(orient):
 
 </details>
 
----
+
 
 ## 7) Nearest-vertex strategy with visited blocking
 Goal: Maintain a vertex list (waypoints). Compute Euclidean distance to the goal and always pick the vertex that is nearest to the goal from the set of available vertices. Keep a list of visited vertices and avoid revisiting.
@@ -305,7 +296,7 @@ def pick_vertex_by_goal(vertices, goal, visited):
 
 </details>
 
----
+
 
 ## 8) Additional ideas and optional challenges
 - Build a memory of explored corridors and try not to re-enter them.
@@ -339,12 +330,12 @@ def pick_move(state):
 
 </details>
 
----
+
 
 **Final notes**
 - These exercises are intentionally partial and didactic; they are meant to inspire incremental development.
 - Insert your helpers into your control loop and keep the interfaces small.
 
----
+
 
 File created as a starting point for exercises and hints.

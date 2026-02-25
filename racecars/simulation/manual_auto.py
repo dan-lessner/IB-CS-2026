@@ -1,3 +1,5 @@
+"""Mouse-driven controller used when a human is playing."""
+
 from simulation.script_api import AutoAuto
 
 
@@ -9,6 +11,7 @@ class MouseAuto(AutoAuto):
         self._queued_target = target
 
     def PickMove(self, auto, world, targets, validity):
+        # Mouse clicks queue exactly one target; after using it we clear the queue.
         if self._queued_target is None:
             return None
         target = self._queued_target

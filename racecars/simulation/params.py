@@ -1,3 +1,5 @@
+"""Container for game configuration values shared across setup and runtime."""
+
 class GameParams:
     def __init__(
         self,
@@ -22,6 +24,7 @@ class GameParams:
         self.measure_performance = measure_performance
 
     def clone(self):
+        # Defensive copy so dialogs/CLI parsing can edit params without side effects.
         return GameParams(
             width=self.width,
             height=self.height,

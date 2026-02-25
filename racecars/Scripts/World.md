@@ -21,13 +21,22 @@ called. It is the same type and structure as the objects inside
 - `car.id`: integer id.
 - `car.name`: car name (from `GetName()` if provided, otherwise the script name).
 - `car.pos`: `Vertex` position with `x` and `y`.
-- `car.vel`: `Vector2i` velocity with `vx` and `vy`.
+- `car.vel`: `Vector2i` velocity with `x` and `y`.
 
 **Auto parameter (your car)**
 - `auto.id`
 - `auto.name`
 - `auto.pos.x`, `auto.pos.y`
-- `auto.vel.vx`, `auto.vel.vy`
+- `auto.vel.x`, `auto.vel.y`
+- `auto.logger` (car-specific logger)
+
+**Logging in scripts**
+- The engine assigns a logger to each script instance as `self.logger`.
+- Use normal logging calls: `self.logger.debug(...)`, `self.logger.info(...)`, `self.logger.warning(...)`, etc.
+- CLI controls from `main.py`:
+  - `--supress-log`
+  - `--log-path PATH`
+  - `--log-level LEVEL`
 
 **Access examples**
 ```python
@@ -35,6 +44,8 @@ from simulation.script_api import AutoAuto
 
 class Auto(AutoAuto):
     def PickMove(self, auto, world, targets, validity):
+        self.logger.debug("Turn for %s at (%s, %s)", auto.name, auto.pos.x, auto.pos.y)
+
         # Check a road cell.
         if world.road[10][5]:
             pass
@@ -43,7 +54,7 @@ class Auto(AutoAuto):
         for car in world.cars:
             x = car.pos.x
             y = car.pos.y
-            speed = abs(car.vel.vx) + abs(car.vel.vy)
+            speed = abs(car.vel.x) + abs(car.vel.y)
 
         # Your car is provided as `auto`.
         my_x = auto.pos.x

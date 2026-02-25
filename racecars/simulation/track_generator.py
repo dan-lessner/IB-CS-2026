@@ -1,3 +1,9 @@
+"""Procedural track generator.
+
+The generator builds a centerline, thickens it into a road, enforces a forward
+pass (without decreasing x), and retries until the track is fully connected.
+"""
+
 import random
 from simulation.game_state import Track, Vertex, Segment
 from typing import List
@@ -12,6 +18,7 @@ def generate_track(
     turn_sharpness: int = 50,
     seed: int = None
 ) -> Track:
+    # If a seed is provided, students can recreate exactly the same track.
     if seed is not None:
         random.seed(seed)
 
@@ -22,7 +29,7 @@ def generate_track(
     last_track = None
 
     while True:
-        # Generate start and finish lines
+        # 1) Place start/finish lines and an empty road grid.
         start_line_length = track_width_mean
         min_line_length = players
         reserve = 1
@@ -44,30 +51,34 @@ def generate_track(
         finish_y = random.randint(0, max_start_y)
 
         start_vertices: List[Vertex] = []
-        i = 0
-        while i < start_line_length:
+        for i in range(start_line_length):
             start_vertices.append(Vertex(start_x, start_y + i))
-            i += 1
 
         finish_line = Segment(Vertex(finish_x, finish_y), Vertex(finish_x, finish_y + start_line_length))
 
-        # Generate road mask
+        # Road mask stores "is this cell road?" as booleans.
         road_mask: List[List[bool]] = []
-        x = 0
-        while x < width:
+        for _ in range(width):
             column: List[bool] = []
-            y = 0
-            while y < height:
+            for _ in range(height):
                 column.append(False)
-                y += 1
             road_mask.append(column)
-            x += 1
 
+        # 2) Draw a curvy centerline and paint road thickness around it.
         centerline = _generate_centerline(width, height, start_y, finish_y, turn_density, turn_sharpness)
         _apply_thickness(road_mask, width, height, centerline, track_width_mean, track_width_var, min_width, max_width)
         _ensure_start_finish(road_mask, width, height, start_y, finish_y, start_line_length)
+        forward_pass_ok = _prune_track_for_forward_pass(
+            road_mask,
+            width,
+            height,
+            start_y,
+            finish_y,
+            start_line_length
+        )
 
-        if _track_is_valid(road_mask, width, height, start_y, finish_y, start_line_length):
+        # 3) Accept only tracks that are truly connected and usable.
+        if forward_pass_ok and _track_is_valid(road_mask, width, height, start_y, finish_y, start_line_length):
             return Track(width, height, road_mask, start_vertices, finish_line)
 
         last_track = Track(width, height, road_mask, start_vertices, finish_line)
@@ -94,9 +105,9 @@ def _generate_centerline(
     turn_density: int,
     turn_sharpness: int
 ) -> List[Vertex]:
+    # Builds a left-to-right path that gravitates toward waypoints.
     path: List[Vertex] = []
 
-    x = 0
     y = start_y
     direction_y = 0
 
@@ -120,7 +131,7 @@ def _generate_centerline(
     if force_window > width // 2:
         force_window = width // 2
 
-    while x < target_x:
+    for x in range(target_x):
         path.append(Vertex(x, y))
 
         if next_wp_index < len(waypoints_x):
@@ -142,31 +153,28 @@ def _generate_centerline(
             direction_y = -direction_y
             next_y = y + direction_y
 
-        x += 1
         y = next_y
 
     path.append(Vertex(target_x, y))
-    while y != finish_y:
-        if y < finish_y:
-            y += 1
-        else:
-            y -= 1
-        path.append(Vertex(target_x, y))
+    if y != finish_y:
+        step = 1 if finish_y > y else -1
+        for ny in range(y + step, finish_y + step, step):
+            y = ny
+            path.append(Vertex(target_x, y))
     return path
 
 
 def _force_vertical_to_target(path: List[Vertex], x: int, y: int, target_y: int) -> int:
     if y == target_y:
         return y
-    step = 1
-    if target_y < y:
-        step = -1
-    while y != target_y:
-        y = y + step
+    step = 1 if target_y > y else -1
+    for ny in range(y + step, target_y + step, step):
+        y = ny
         path.append(Vertex(x, y))
     return y
 
 def _build_waypoints(width: int, height: int, start_y: int, finish_y: int):
+    # Waypoints force larger shape changes so tracks do not become straight corridors.
     if width < 2:
         return [0], [start_y]
 
@@ -187,8 +195,7 @@ def _build_waypoints(width: int, height: int, start_y: int, finish_y: int):
     waypoints_y.append(start_y)
 
     last_x = 0
-    index = 1
-    while index < segment_count - 1:
+    for index in range(1, segment_count - 1):
         wx = index * step_x
         if wx <= last_x:
             wx = last_x + 1
@@ -196,7 +203,6 @@ def _build_waypoints(width: int, height: int, start_y: int, finish_y: int):
             break
         waypoints_x.append(wx)
         last_x = wx
-        index += 1
 
     if last_x != width - 1:
         waypoints_x.append(width - 1)
@@ -207,8 +213,7 @@ def _build_waypoints(width: int, height: int, start_y: int, finish_y: int):
     first_edge = _edge_target_for_start(height, start_y)
     edge_y = first_edge
 
-    index = 0
-    while index < internal_count:
+    for index in range(internal_count):
         use_edge = True
         if index % 2 == 1:
             use_edge = False
@@ -222,7 +227,6 @@ def _build_waypoints(width: int, height: int, start_y: int, finish_y: int):
 
         waypoints_y.append(wy)
         prev_y = wy
-        index += 1
 
     waypoints_y.append(finish_y)
     return waypoints_x, waypoints_y
@@ -231,12 +235,10 @@ def _build_waypoints(width: int, height: int, start_y: int, finish_y: int):
 def _pick_waypoint_y(height: int, prev_y: int) -> int:
     if height <= 0:
         return 0
-    tries = 0
-    while tries < 8:
+    for _ in range(8):
         y = random.randint(0, height - 1)
         if abs(y - prev_y) > 3:
             return y
-        tries += 1
     return random.randint(0, height - 1)
 
 
@@ -265,6 +267,8 @@ def _pick_direction_with_bias(
     turn_density: int,
     turn_sharpness: int
 ) -> int:
+    # Weighted random steering: prefer moving toward the current target_y,
+    # while still allowing some noise for variety.
     if height <= 1:
         return 0
 
@@ -325,6 +329,7 @@ def _apply_thickness(
     min_width: int,
     max_width: int
 ):
+    # Converts centerline points into a drivable ribbon with varying width.
     if min_width < 1:
         min_width = 1
     if max_width < min_width:
@@ -338,9 +343,7 @@ def _apply_thickness(
 
     current_base = _clamp_int(track_width_mean, min_width, max_width)
 
-    index = 0
-    while index < len(centerline):
-        point = centerline[index]
+    for index, point in enumerate(centerline):
         if index % change_interval == 0:
             current_base = _random_between(min_width, max_width)
         width_offset = random.randint(-track_width_var, track_width_var)
@@ -350,18 +353,12 @@ def _apply_thickness(
             track_width = 1
         radius = track_width // 2
 
-        dx = -radius
-        while dx <= radius:
-            dy = -radius
-            while dy <= radius:
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
                 x = point.x + dx
                 y = point.y + dy
                 if 0 <= x < width and 0 <= y < height:
                     road_mask[x][y] = True
-                dy += 1
-            dx += 1
-
-        index += 1
 
 def _ensure_start_finish(
     road_mask: List[List[bool]],
@@ -371,17 +368,176 @@ def _ensure_start_finish(
     finish_y: int,
     line_length: int
 ):
-    y = start_y
-    while y < start_y + line_length and y < height:
+    for y in range(start_y, min(start_y + line_length, height)):
         if 0 <= 0 < width:
             road_mask[0][y] = True
-        y += 1
 
-    y = finish_y
-    while y < finish_y + line_length and y < height:
+    for y in range(finish_y, min(finish_y + line_length, height)):
         if 0 <= width - 1 < width:
             road_mask[width - 1][y] = True
+
+def _prune_track_for_forward_pass(
+    road_mask: List[List[bool]],
+    width: int,
+    height: int,
+    start_y: int,
+    finish_y: int,
+    line_length: int
+) -> bool:
+    """Simulate a run that never decreases x and prune dead-end nodes on the way."""
+    if width <= 0 or height <= 0:
+        return False
+
+    start_cell = _pick_forward_start_cell(road_mask, width, height, start_y, finish_y, line_length)
+    if start_cell is None:
+        return False
+
+    finish_mid_y = finish_y + (line_length // 2)
+    dead_end: List[List[bool]] = []
+    for _ in range(width):
+        dead_end_column: List[bool] = []
+        for _ in range(height):
+            dead_end_column.append(False)
+        dead_end.append(dead_end_column)
+
+    on_path: List[List[bool]] = []
+    for _ in range(width):
+        path_column: List[bool] = []
+        for _ in range(height):
+            path_column.append(False)
+        on_path.append(path_column)
+
+    stack = []
+    stack.append(start_cell)
+    start_x = start_cell[0]
+    start_cell_y = start_cell[1]
+    on_path[start_x][start_cell_y] = True
+
+    while len(stack) > 0:
+        current = stack[len(stack) - 1]
+        cx = current[0]
+        cy = current[1]
+
+        if _is_finish_cell(cx, cy, width, finish_y, line_length):
+            return True
+
+        next_cell = _pick_forward_neighbor(
+            road_mask,
+            width,
+            height,
+            cx,
+            cy,
+            finish_mid_y,
+            dead_end,
+            on_path
+        )
+
+        if next_cell is not None:
+            nx = next_cell[0]
+            ny = next_cell[1]
+            stack.append((nx, ny))
+            on_path[nx][ny] = True
+            continue
+
+        # No forward-safe move from this node. Remove it when possible and backtrack.
+        protected = _cell_is_protected(cx, cy, width, start_y, finish_y, line_length)
+        if not protected:
+            road_mask[cx][cy] = False
+        dead_end[cx][cy] = True
+        on_path[cx][cy] = False
+        stack.pop()
+
+    return False
+
+def _pick_forward_start_cell(
+    road_mask: List[List[bool]],
+    width: int,
+    height: int,
+    start_y: int,
+    finish_y: int,
+    line_length: int
+):
+    if width <= 0 or height <= 0:
+        return None
+
+    best = None
+    best_score = None
+    finish_mid_y = finish_y + (line_length // 2)
+    y_end = start_y + line_length
+    if y_end > height:
+        y_end = height
+
+    y = start_y
+    while y < y_end:
+        if road_mask[0][y]:
+            score = abs(y - finish_mid_y)
+            if best is None or score < best_score:
+                best = (0, y)
+                best_score = score
         y += 1
+
+    return best
+
+def _pick_forward_neighbor(
+    road_mask: List[List[bool]],
+    width: int,
+    height: int,
+    x: int,
+    y: int,
+    finish_mid_y: int,
+    dead_end: List[List[bool]],
+    on_path: List[List[bool]]
+):
+    vertical_step = 1
+    if finish_mid_y < y:
+        vertical_step = -1
+
+    candidates = []
+    candidates.append((x + 1, y))
+    candidates.append((x, y + vertical_step))
+    candidates.append((x, y - vertical_step))
+
+    for candidate in candidates:
+        nx = candidate[0]
+        ny = candidate[1]
+        if nx < 0 or nx >= width:
+            continue
+        if ny < 0 or ny >= height:
+            continue
+        if nx < x:
+            continue
+        if not road_mask[nx][ny]:
+            continue
+        if dead_end[nx][ny]:
+            continue
+        if on_path[nx][ny]:
+            continue
+        return (nx, ny)
+
+    return None
+
+def _is_finish_cell(x: int, y: int, width: int, finish_y: int, line_length: int) -> bool:
+    if x != width - 1:
+        return False
+    if y < finish_y:
+        return False
+    if y >= finish_y + line_length:
+        return False
+    return True
+
+def _cell_is_protected(
+    x: int,
+    y: int,
+    width: int,
+    start_y: int,
+    finish_y: int,
+    line_length: int
+) -> bool:
+    if x == 0 and y >= start_y and y < start_y + line_length:
+        return True
+    if x == width - 1 and y >= finish_y and y < finish_y + line_length:
+        return True
+    return False
 
 def _track_is_valid(
     road_mask: List[List[bool]],
@@ -391,15 +547,14 @@ def _track_is_valid(
     finish_y: int,
     line_length: int
 ) -> bool:
+    # Breadth-first search ensures every road cell is connected and finish is reachable.
     if width <= 0 or height <= 0:
         return False
 
     start_cells = []
-    y = start_y
-    while y < start_y + line_length and y < height:
+    for y in range(start_y, min(start_y + line_length, height)):
         if road_mask[0][y]:
             start_cells.append((0, y))
-        y += 1
 
     if len(start_cells) == 0:
         return False
@@ -408,23 +563,16 @@ def _track_is_valid(
         return False
 
     visited: List[List[bool]] = []
-    x = 0
-    while x < width:
+    for _ in range(width):
         column: List[bool] = []
-        y = 0
-        while y < height:
+        for _ in range(height):
             column.append(False)
-            y += 1
         visited.append(column)
-        x += 1
 
     queue = []
     queue.append(start_cells[0])
     visited[start_cells[0][0]][start_cells[0][1]] = True
-    index = 0
-    while index < len(queue):
-        cx, cy = queue[index]
-        index += 1
+    for cx, cy in queue:
 
         nx = cx - 1
         ny = cy
@@ -450,25 +598,19 @@ def _track_is_valid(
             visited[nx][ny] = True
             queue.append((nx, ny))
 
-    y = finish_y
     finish_reached = False
-    while y < finish_y + line_length and y < height:
+    for y in range(finish_y, min(finish_y + line_length, height)):
         if visited[width - 1][y]:
             finish_reached = True
             break
-        y += 1
 
     if not finish_reached:
         return False
 
-    x = 0
-    while x < width:
-        y = 0
-        while y < height:
+    for x in range(width):
+        for y in range(height):
             if road_mask[x][y] and not visited[x][y]:
                 return False
-            y += 1
-        x += 1
 
     return True
 
@@ -478,10 +620,7 @@ def _start_has_exit(
     height: int,
     start_cells
 ) -> bool:
-    index = 0
-    while index < len(start_cells):
-        x = start_cells[index][0]
-        y = start_cells[index][1]
+    for x, y in start_cells:
         has_exit = False
         if x + 1 < width and road_mask[x + 1][y]:
             has_exit = True
@@ -491,7 +630,6 @@ def _start_has_exit(
             has_exit = True
         if not has_exit:
             return False
-        index += 1
     return True
 
 def _relax_params(
@@ -503,6 +641,7 @@ def _relax_params(
     min_width: int,
     max_width: int
 ):
+    # Every few failed attempts we make generation easier to avoid infinite retries.
     if attempts % 5 != 0:
         return track_width_mean, track_width_var, turn_density, turn_sharpness
 

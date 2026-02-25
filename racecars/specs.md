@@ -46,11 +46,11 @@
   * `id: int`
   * `name: str` (**náhodně volené** při vytvoření)
   * `pos: Vertex` (x,y)
-  * `vel: Vector2i` (vx,vy; celé)
-  * `penalty_turns_left: int`
+  * `vel: Vector2i` (x,y; celé)
+  * `penalty: int`
   * `path: list[Segment]` (pro replay/log; vizualizace si to jen čte)
 
-  * jmena aut jsou **nahodna**, bez kolizi (pripadne s ciselnym suffixem)
+  * jmena aut jsou **nahodna**, bez kolizi 
 
 ### 2.2 Grafika / UI (render + input)
 
@@ -77,7 +77,7 @@
 * **Pravidlo akcelerace:**
 
   * zvol `ax, ay ∈ {-1,0,+1}`
-  * `vel' = (vx+ax, vy+ay)`
+  * `vel' = (x+ax, y+ay)`
   * `pos' = pos + vel'`
 * **UI výběr:**
 
@@ -113,7 +113,7 @@
     * collision_point: pro jednoduchost použít `pos'` (zamýšlený cíl) nebo „nejbližší validní“ bod na segmentu; **priorita: přímočarost**
     * při více kandidátech: **náhodně**
   * `vel := (0,0)`
-  * `penalty_turns_left := 2`
+  * `penalty := 2`
 
   * i pri narazu se do `car.path` prida **usek z predchozi pozice do mista narazu**
 

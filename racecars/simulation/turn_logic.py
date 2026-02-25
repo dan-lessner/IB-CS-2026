@@ -1,30 +1,32 @@
+"""Apply one player's chosen action and update the shared game state."""
+
 from simulation.game_state import GameState, Vertex, Vector2i, Segment
 
 class TurnLogic:
     @staticmethod
-    def apply_move(game_state: GameState, car_id: int, acceleration: Vector2i):
+    def apply_move(game_state: GameState, car_id: int, intended_target: Vertex):
         if game_state.finished:
             return
 
         car = game_state.cars[car_id]
 
-        if car.penalty_turns_left > 0:
-            car.penalty_turns_left -= 1
-            game_state.next_player()
+        if car.penalty > 0:
+            # Crash penalty consumes turns before the car can move again.
+            car.penalty -= 1
+            TurnLogic._advance_turn_and_finalize_if_needed(game_state)
             return
-
-        # Calculate new velocity
-        new_velocity = Vector2i(car.vel.vx + acceleration.vx, car.vel.vy + acceleration.vy)
-
-        # Calculate intended position
-        intended_position = Vertex(car.pos.x + new_velocity.vx, car.pos.y + new_velocity.vy)
 
         old_position = car.pos
 
+        # Velocity is derived from target delta, not from acceleration.
+        new_velocity = intended_target - old_position
+        intended_position = old_position + new_velocity
+
         finish_vertex = game_state.track.finish_vertex_for_segment(old_position, intended_position)
         if finish_vertex is not None:
+            # Crossing the finish line snaps movement to that line segment.
             new_position = finish_vertex
-            new_velocity = Vector2i(new_position.x - old_position.x, new_position.y - old_position.y)
+            new_velocity = new_position - old_position
         else:
             new_position = intended_position
 
@@ -33,21 +35,21 @@ class TurnLogic:
         segment_valid = game_state.track.segment_is_valid(old_position, new_position)
 
         if target_occupied or not segment_valid:
-            # Handle collision or off-track move
+            # Collision/off-track handling: keep a crash segment and reset speed.
             exit_point = game_state.track.first_invalid_point_on_segment(old_position, new_position)
             if exit_point is None:
                 collision_point = new_position
-                collision_vertex = Vertex(collision_point.x, collision_point.y)
+                collision_vertex = collision_point
                 car.pos = game_state.track.nearest_inside_vertex(collision_point)
             else:
                 collision_vertex = Vertex(int(round(exit_point[0])), int(round(exit_point[1])))
                 car.pos = game_state.track.nearest_inside_vertex_from_point(exit_point[0], exit_point[1])
-            if not (collision_vertex.x == old_position.x and collision_vertex.y == old_position.y):
+            if collision_vertex != old_position:
                 car.path.append(Segment(old_position, collision_vertex))
             car.vel = Vector2i(0, 0)
-            car.penalty_turns_left = 2
+            car.penalty = 2
         else:
-            # Apply the move
+            # Normal move: append to replay path and keep new velocity.
             car.path.append(Segment(old_position, new_position))
             car.pos = new_position
             car.vel = new_velocity
@@ -59,54 +61,34 @@ class TurnLogic:
                 crossed_finish = True
 
         if crossed_finish:
+            # Game ends only after everyone had the same number of turns.
             if not TurnLogic._winner_exists(game_state, car.id):
                 game_state.winners.append(car.id)
             if not game_state.finish_triggered:
                 game_state.finish_triggered = True
                 game_state.finish_after_player_idx = game_state.current_player_idx
 
-        # Update the current player index
-        game_state.next_player()
-
-        if game_state.finish_triggered:
-            if game_state.current_player_idx == game_state.finish_after_player_idx:
-                game_state.finished = True
-
-    @staticmethod
-    def apply_wait_move(game_state: GameState, car_id: int):
-        if game_state.finished:
-            return
-
-        car = game_state.cars[car_id]
-
-        if car.penalty_turns_left > 0:
-            car.penalty_turns_left -= 1
-            game_state.next_player()
-            return
-
-        car.vel = Vector2i(0, 0)
-        game_state.next_player()
-
-        if game_state.finish_triggered:
-            if game_state.current_player_idx == game_state.finish_after_player_idx:
-                game_state.finished = True
+        TurnLogic._advance_turn_and_finalize_if_needed(game_state)
 
     @staticmethod
     def _target_is_occupied(game_state: GameState, car_id: int, target: Vertex) -> bool:
-        index = 0
-        while index < len(game_state.cars):
+        for index in range(len(game_state.cars)):
             if index != car_id:
                 other = game_state.cars[index]
-                if other.pos.x == target.x and other.pos.y == target.y:
+                if other.pos == target:
                     return True
-            index += 1
         return False
 
     @staticmethod
     def _winner_exists(game_state: GameState, car_id: int) -> bool:
-        index = 0
-        while index < len(game_state.winners):
-            if game_state.winners[index] == car_id:
+        for winner_id in game_state.winners:
+            if winner_id == car_id:
                 return True
-            index += 1
         return False
+
+    @staticmethod
+    def _advance_turn_and_finalize_if_needed(game_state: GameState):
+        game_state.next_player()
+        if game_state.finish_triggered:
+            if game_state.current_player_idx == game_state.finish_after_player_idx:
+                game_state.finished = True

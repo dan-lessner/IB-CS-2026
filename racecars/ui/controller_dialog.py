@@ -1,3 +1,5 @@
+"""UI for assigning each player to mouse control or a script controller."""
+
 import pygame
 
 
@@ -12,6 +14,7 @@ class ControllerDialog:
         self.fields = []
 
     def run(self):
+        # Show one selector per player and return selected controller names.
         pygame.init()
         width = 640
         height = 180 + self.players * 34
@@ -38,17 +41,16 @@ class ControllerDialog:
 
     def _build_fields(self):
         self.fields = []
-        index = 0
-        while index < self.players:
+        for index in range(self.players):
             label = "Player " + str(index + 1)
             default_name = ""
             if index < len(self.default_selection):
                 default_name = self.default_selection[index]
             option_index = self._index_for_name(default_name)
             self.fields.append(_ControllerField(label, self.options, option_index))
-            index += 1
 
     def _handle_mouse(self, pos):
+        # Clicking a field cycles through available controller options.
         x, y = pos
         field_index = self._field_index_at(y)
         if field_index is not None:
@@ -67,9 +69,7 @@ class ControllerDialog:
         self.screen.blit(title, (20, 20))
 
         y = 70
-        index = 0
-        while index < len(self.fields):
-            field = self.fields[index]
+        for field in self.fields:
             label = self.font.render(field.label, True, (0, 0, 0))
             self.screen.blit(label, (20, y))
             box_rect = pygame.Rect(260, y - 4, 260, 26)
@@ -79,7 +79,6 @@ class ControllerDialog:
             value_label = self.font.render(value, True, (0, 0, 0))
             self.screen.blit(value_label, (265, y))
             y += 34
-            index += 1
 
         self._draw_button(500, 20, 110, 40, "Start")
         pygame.display.flip()
@@ -102,31 +101,25 @@ class ControllerDialog:
 
     def _field_index_at(self, y):
         top = 70
-        index = 0
-        while index < len(self.fields):
+        for index in range(len(self.fields)):
             field_top = top + index * 34
             if y >= field_top - 4 and y <= field_top + 22:
                 return index
-            index += 1
         return None
 
     def _index_for_name(self, name):
         if name == "":
             return 0
-        index = 0
-        while index < len(self.options):
-            if self.options[index] == name:
+        for index, option in enumerate(self.options):
+            if option == name:
                 return index
-            index += 1
         return 0
 
     def _collect_values(self):
+        # Return plain strings so main.py can map names back to drivers.
         result = []
-        index = 0
-        while index < len(self.fields):
-            field = self.fields[index]
+        for field in self.fields:
             result.append(field.options[field.index])
-            index += 1
         return result
 
 
