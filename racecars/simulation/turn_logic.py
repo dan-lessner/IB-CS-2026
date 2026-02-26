@@ -47,7 +47,10 @@ class TurnLogic:
             if collision_vertex != old_position:
                 car.path.append(Segment(old_position, collision_vertex))
             car.vel = Vector2i(0, 0)
-            car.penalty = 2
+            if TurnLogic._should_apply_penalty(game_state, target_occupied, segment_valid):
+                car.penalty = TurnLogic._compute_penalty_rounds(game_state, new_velocity)
+            else:
+                car.penalty = 0
         else:
             # Normal move: append to replay path and keep new velocity.
             car.path.append(Segment(old_position, new_position))
@@ -92,3 +95,31 @@ class TurnLogic:
         if game_state.finish_triggered:
             if game_state.current_player_idx == game_state.finish_after_player_idx:
                 game_state.finished = True
+
+    @staticmethod
+    def _should_apply_penalty(game_state: GameState, target_occupied: bool, segment_valid: bool):
+        # Off-track collisions still penalize. Car-to-car penalty can be disabled.
+        if not segment_valid:
+            return True
+        if target_occupied and game_state.car_collision_penalty_enabled:
+            return True
+        return False
+
+    @staticmethod
+    def _compute_penalty_rounds(game_state: GameState, collision_velocity: Vector2i):
+        if game_state.penalty_mode == "velocity_plus":
+            base_speed = TurnLogic._velocity_size(collision_velocity)
+            rounds = base_speed + game_state.penalty_value
+        else:
+            rounds = game_state.penalty_value
+        if rounds < 0:
+            rounds = 0
+        return rounds
+
+    @staticmethod
+    def _velocity_size(velocity: Vector2i):
+        x_size = abs(velocity.x)
+        y_size = abs(velocity.y)
+        if x_size >= y_size:
+            return x_size
+        return y_size

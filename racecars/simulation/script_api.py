@@ -34,12 +34,13 @@ class CarInfo:
 
 
 class WorldState:
-    def __init__(self, road, start_vertices, finish_vertices, cars):
+    def __init__(self, road, start_vertices, finish_vertices, cars, race_round):
         # Snapshot passed to scripts so they can plan their next target.
         self.road = road
         self.start_vertices = start_vertices
         self.finish_vertices = finish_vertices
         self.cars = cars
+        self.race_round = race_round
 
 
 def build_world_state(game_state):
@@ -53,7 +54,7 @@ def build_world_state(game_state):
         cars.append(car_info)
 
     start_vertices = _copy_vertices(track.start_vertices)
-    return WorldState(track.road_mask, start_vertices, finish_vertices, cars)
+    return WorldState(track.road_mask, start_vertices, finish_vertices, cars, game_state.race_round)
 
 
 def _copy_vertices(vertices):

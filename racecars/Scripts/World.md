@@ -16,6 +16,7 @@ called. It is the same type and structure as the objects inside
 - `world.finish_vertices`: list of `Vertex` objects for the finish line. These
   can include `x == track_width`, so do not index them into `world.road`.
 - `world.cars`: list of `CarInfo` objects for every car on the track.
+- `world.race_round`: current round number (starts at `1`; increases after each full cycle of all players).
 
 **CarInfo fields**
 - `car.id`: integer id.

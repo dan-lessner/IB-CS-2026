@@ -386,23 +386,70 @@ class Track:
         return value
 
 class GameState:
-    def __init__(self, track: Track, cars: List[Car]):
+    def __init__(
+        self,
+        track: Track,
+        cars: List[Car],
+        car_collision_penalty_enabled: bool = True,
+        shuffle_turn_order_each_round: bool = False,
+        strict_target_check: bool = False,
+        penalty_mode: str = "fixed",
+        penalty_value: int = 2
+    ):
         # Global mutable state for one full game session.
         self.track = track
         self.cars = cars
+        self.car_collision_penalty_enabled = car_collision_penalty_enabled
+        self.shuffle_turn_order_each_round = shuffle_turn_order_each_round
+        self.strict_target_check = strict_target_check
+        self.penalty_mode = penalty_mode
+        self.penalty_value = penalty_value
+        self.turn_order: List[int] = []
+        self.turn_order_position = 0
         self.current_player_idx = 0  # Index of the current player
+        self.race_round = 1  # Starts at 1 and increases after each full player cycle.
         self.finished = False  # Whether the game is finished
         self.winners: List[int] = []  # List of winner IDs
         self.finish_triggered = False
         self.finish_after_player_idx = None
         self.performance = None
+        self._initialize_turn_order()
 
     def __repr__(self):
-        return f"GameState(current_player_idx={self.current_player_idx}, finished={self.finished}, winners={self.winners})"
+        return (
+            "GameState("
+            + "current_player_idx="
+            + str(self.current_player_idx)
+            + ", race_round="
+            + str(self.race_round)
+            + ", finished="
+            + str(self.finished)
+            + ", winners="
+            + str(self.winners)
+            + ")"
+        )
 
     def next_player(self):
-        # Advance to the next player
-        self.current_player_idx = (self.current_player_idx + 1) % len(self.cars)
+        # Advance to the next player using the index order list.
+        if len(self.turn_order) == 0:
+            self.current_player_idx = 0
+            return
+
+        self.turn_order_position += 1
+        wrapped_to_new_round = False
+        if self.turn_order_position >= len(self.turn_order):
+            self.turn_order_position = 0
+            wrapped_to_new_round = True
+
+        if wrapped_to_new_round:
+            self.race_round += 1
+            if self.shuffle_turn_order_each_round and len(self.turn_order) > 1:
+                # Keep order stable after finish was triggered,
+                # so each remaining player gets exactly one catch-up turn.
+                if not self.finish_triggered:
+                    random.shuffle(self.turn_order)
+
+        self.current_player_idx = self.turn_order[self.turn_order_position]
 
     def check_game_finished(self):
         # Check if any car would cross the finish line on its current segment.
@@ -416,3 +463,17 @@ class GameState:
             self.winners = winners
             self.finish_triggered = True
             self.finish_after_player_idx = self.current_player_idx
+
+    def _initialize_turn_order(self):
+        self.turn_order = []
+        for index in range(len(self.cars)):
+            self.turn_order.append(index)
+
+        if self.shuffle_turn_order_each_round and len(self.turn_order) > 1:
+            random.shuffle(self.turn_order)
+
+        self.turn_order_position = 0
+        if len(self.turn_order) > 0:
+            self.current_player_idx = self.turn_order[0]
+        else:
+            self.current_player_idx = 0

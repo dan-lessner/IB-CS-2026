@@ -11,8 +11,29 @@ from simulation.controller import Controller
 
 _LOGGER = logging.getLogger("racecars.renderer")
 
+_CAR_COLOR_NAMES = [
+    "darkred",
+    "darkgreen",
+    "navy",
+    "teal",
+    "darkmagenta",
+    "chocolate",
+    "dodgerblue",
+    "crimson",
+    "olivedrab",
+    "saddlebrown",
+    "firebrick",
+    "midnightblue",
+]
+
 class Renderer:
-    def __init__(self, game_state: GameState, screen_width: int = None, screen_height: int = None):
+    def __init__(
+        self,
+        game_state: GameState,
+        screen_width: int = None,
+        screen_height: int = None,
+        framerate: int = 30
+    ):
         pygame.init()
         self.game_state = game_state
         self.controller = Controller(game_state)
@@ -22,7 +43,13 @@ class Renderer:
             screen_width, screen_height = self._compute_screen_size()
         self.screen = pygame.display.set_mode((screen_width, screen_height))
         self.clock = pygame.time.Clock()
-        self.car_colors = self._assign_car_colors()
+        self.framerate = framerate
+
+        self.car_colors = []
+        for color_name in _CAR_COLOR_NAMES:
+            self.car_colors.append(pygame.colordict.THECOLORS[color_name])
+        random.shuffle(self.car_colors)
+        
         self.font = pygame.font.SysFont("consolas", 18)
         self._missing_start_line_warning_emitted = False
         self._missing_car_id_warnings = set()
@@ -74,7 +101,7 @@ class Renderer:
 
     def draw_cars(self):
         for car in self.game_state.cars:
-            color = self._get_car_color(car.id)
+            color = self.car_colors[car.id]
             # Draw the historical path so students can replay decision outcomes.
             for segment in car.path:
                 start_pos = self._vertex_to_screen(segment.start.x, segment.start.y)
@@ -130,6 +157,7 @@ class Renderer:
         self.draw_possible_targets()
         self.draw_cars()
         self.draw_status()
+        self.draw_round_counter()
         pygame.display.flip()
 
     def run(self):
@@ -144,7 +172,7 @@ class Renderer:
 
             self.controller.update()
             self.render()
-            self.clock.tick(30)
+            self.clock.tick(self.framerate)
 
         pygame.quit()
 
@@ -152,25 +180,6 @@ class Renderer:
         screen_x = self.margin + x * self.cell_size
         screen_y = self.margin + y * self.cell_size
         return (screen_x, screen_y)
-
-    def _assign_car_colors(self):
-        colors = {}
-        for car in self.game_state.cars:
-            colors[car.id] = self._random_car_color()
-        return colors
-
-    def _random_car_color(self):
-        r = random.randint(60, 255)
-        g = random.randint(60, 255)
-        b = random.randint(60, 255)
-        return (r, g, b)
-
-    def _get_car_color(self, car_id: int):
-        if car_id in self.car_colors:
-            return self.car_colors[car_id]
-        color = self._random_car_color()
-        self.car_colors[car_id] = color
-        return color
 
     def _draw_target_preview_lines(self):
         # Light guide lines make the acceleration options easier to read visually.
@@ -224,7 +233,7 @@ class Renderer:
                 winner_text = "Car " + str(winner_id + 1) + ": " + winner.name
                 parts = [
                     ("Winner: ", (0, 0, 0)),
-                    (winner_text, self._get_car_color(winner_id))
+                    (winner_text, self.car_colors[winner.id])
                 ]
                 self._blit_text_parts(x, y, parts)
             else:
@@ -235,9 +244,16 @@ class Renderer:
             current = self.game_state.cars[self.game_state.current_player_idx]
             parts = [
                 ("Turn: ", (0, 0, 0)),
-                (current.name, self._get_car_color(current.id))
+                (current.name, self.car_colors[current.id])
             ]
             self._blit_text_parts(x, y, parts)
+
+    def draw_round_counter(self):
+        round_text = "Round: " + str(self.game_state.race_round)
+        label = self.font.render(round_text, True, (0, 0, 0))
+        x = self.screen.get_width() - label.get_width() - 10
+        y = 10
+        self.screen.blit(label, (x, y))
 
     def _join_winners(self):
         text = ""
@@ -263,7 +279,7 @@ class Renderer:
             if index > 0:
                 parts.append((", ", (0, 0, 0)))
             text = "Car " + str(winner_id + 1) + ": " + winner.name
-            parts.append((text, self._get_car_color(winner_id)))
+            parts.append((text, self.car_colors[winner.id]))
         return parts
 
     def _blit_text_parts(self, x: int, y: int, parts):

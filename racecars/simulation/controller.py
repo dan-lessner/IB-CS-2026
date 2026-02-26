@@ -9,6 +9,7 @@ from simulation.game_state import GameState, Vertex
 from simulation.move_generator import get_ordered_targets_and_validity
 from simulation.turn_logic import TurnLogic
 from simulation.script_api import build_world_state
+from simulation.manual_auto import MouseAuto
 
 _LOGGER = logging.getLogger("racecars.controller")
 
@@ -53,8 +54,20 @@ class Controller:
         pickmove_failed = False
         try:
             target = car.PickMove(world, targets, validity)
+            if target is None and isinstance(car.driver, MouseAuto):
+                # Manual drivers can return None while waiting for a click.
+                return
             if not isinstance(target, Vertex):
                 raise ValueError(f"PickMove() returned an invalid target of type {type(target).__name__}.")
+            if self.game_state.strict_target_check:
+                if not self._target_in_generated_targets(target, targets):
+                    pickmove_failed = True
+                    car.logger.warning(
+                        "PickMove() returned target (%s, %s), which is not in generated targets. "
+                        "Strict target check is ON, applying safe fallback move.",
+                        target.x,
+                        target.y
+                    )
         except Exception as ex:
             pickmove_failed = True
             car.logger.exception(
@@ -92,18 +105,18 @@ class Controller:
             )
         return targets, validity
 
-    def _target_in_list(self, target, allowed):
-        for allowed_target in allowed:
-            if allowed_target == target:
-                return True
-        return False
-
     def _drifting_target(self, car_id):
         # Ordered targets map ax=-1..1, ay=-1..1, so center is index 4.
         # But we generate it new, in case something is wrong with the provided list
         car = self.game_state.cars[car_id]
         return car.pos + car.vel
-    
+
+    def _target_in_generated_targets(self, target, targets):
+        for item in targets:
+            if item == target:
+                return True
+        return False
+
     def _driver_waits_for_click(self, driver) -> bool:
         if driver is None:
             return False
@@ -116,5 +129,3 @@ class Controller:
         if not self.game_state.finished:
             return
         tracker.report_if_ready(self.game_state.cars)
-
-
