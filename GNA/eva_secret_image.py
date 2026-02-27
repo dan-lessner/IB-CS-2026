@@ -40,11 +40,11 @@ class Jedinec :
 class Evoluce :
     def __init__(self) :
         self.cil = [0, 0, 1, 0, 0,
-           0, 0, 1, 0, 0,
-           1, 1, 1, 1, 1,
-           0, 0, 1, 0, 0,
-           0, 0, 1, 0, 0]
-        self.pocet_generaci = 100
+                    0, 0, 1, 0, 0,
+                    1, 1, 1, 1, 1,
+                    0, 0, 1, 0, 0,
+                    0, 0, 1, 0, 0]
+        self.pocet_generaci = 50
         self.p_mut = 0.05
         self.velikost_populace = 20
         self.populace = []
@@ -72,8 +72,10 @@ class Evoluce :
             # mladi vpred
             self.populace = nova_populace
             # vypis vysledku
-            print("vitez generace c. ", generace)
+            print("vitez generace c. ", generace, len(self.populace))
             print(self.populace[0])
-        
+            if self.populace[0].fitness(self.cil) == self.populace[0].delka :
+                print("Evolution peaked.")
+                break
 E = Evoluce()
 E.vyres()
